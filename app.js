@@ -914,22 +914,123 @@ function renderGoalSetupStep(step){
   }
 }
 
+function routineYearsWithData(r){
+  const years=new Set([new Date().getFullYear()]);
+  const g=ensureRoutineGoalShape(r);
+  if(g.startedAt) years.add(parseInt(g.startedAt.slice(0,4)));
+  (r.entries||[]).forEach(e=>{ if(e.date) years.add(parseInt(e.date.slice(0,4))); });
+  return [...years].filter(Boolean).sort((a,b)=>b-a);
+}
+function routineSuccessCountBetween(r,start,end){
+  let n=0;
+  for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+    if(routineSuccess(r,routineEntry(r,dkey(d)))) n++;
+  }
+  return n;
+}
+function routineWeekStat(r,refDate){
+  const g=ensureRoutineGoalShape(r);
+  const start=startOfWeek(refDate), end=new Date(start); end.setDate(end.getDate()+6);
+  const count=routineSuccessCountBetween(r,start,end);
+  const target=Math.max(1,g.weeklyTarget||1);
+  return {start,end,count,target,rate:Math.min(100,Math.round(count/target*100))};
+}
+function routineMonthWeekAverage(r,year,month){
+  const g=ensureRoutineGoalShape(r);
+  const first=new Date(year,month,1), last=new Date(year,month+1,0);
+  const today=new Date(); today.setHours(0,0,0,0);
+  const effectiveLast=last>today?today:last;
+  if(first>effectiveLast) return {avg:0, weeks:0, success:0, target:g.weeklyTarget||1, rate:0};
+  let weekStart=startOfWeek(first), totalSuccess=0, weekCount=0;
+  while(weekStart<=effectiveLast){
+    const weekEnd=new Date(weekStart); weekEnd.setDate(weekEnd.getDate()+6);
+    const segStart=weekStart<first?first:weekStart;
+    const segEnd=weekEnd>effectiveLast?effectiveLast:weekEnd;
+    totalSuccess+=routineSuccessCountBetween(r,segStart,segEnd);
+    weekCount++;
+    weekStart=new Date(weekStart); weekStart.setDate(weekStart.getDate()+7);
+  }
+  const avg=weekCount?Math.round((totalSuccess/weekCount)*10)/10:0;
+  const target=Math.max(1,g.weeklyTarget||1);
+  return {avg,weeks:weekCount,success:totalSuccess,target,rate:Math.min(100,Math.round(avg/target*100))};
+}
+function renderRoutineYearGrid(r,year){
+  const jan1=new Date(year,0,1), start=new Date(jan1); start.setDate(start.getDate()-jan1.getDay());
+  const dec31=new Date(year,11,31), today=new Date(); today.setHours(0,0,0,0);
+  const g=ensureRoutineGoalShape(r);
+  let cells='',i=0; const monthAt={};
+  for(const d=new Date(start); d<=dec31; d.setDate(d.getDate()+1),i++){
+    if(d<jan1){ cells+=`<div class="heatmap-cell empty"></div>`; continue; }
+    if(d.getDate()===1) monthAt[Math.floor(i/7)]=(d.getMonth()+1)+'월';
+    const key=dkey(d), future=d>today, before=g.startedAt && key<g.startedAt;
+    if(future || before){
+      cells+=`<div class="heatmap-cell mbo-unavailable" title="${key} · ${future?'미래 날짜':'목표 시작 전'}"></div>`;
+    }else{
+      const e=routineEntry(r,key), ok=routineSuccess(r,e);
+      const detail=e ? routineValueLabel(r,e) : '기록 없음';
+      cells+=`<div class="heatmap-cell ${ok?'l3':''}" title="${key} · ${ok?'달성':'미달성'} · ${escapeHtml(detail)}"></div>`;
+    }
+  }
+  const cols=Math.ceil(i/7); let months='';
+  for(let c=0;c<cols;c++) months+=`<span>${monthAt[c]||''}</span>`;
+  document.getElementById('routineDetailHeatmap').innerHTML=cells;
+  document.getElementById('routineYearMonths').innerHTML=months;
+  document.getElementById('routineYearGridTitle').textContent=`${year}년 전체 기록`;
+}
+function renderRoutineMonthChart(r,year){
+  const box=document.getElementById('routineMonthChart');
+  const vals=Array.from({length:12},(_,m)=>routineMonthWeekAverage(r,year,m));
+  const max=Math.max(1,...vals.map(v=>v.avg),ensureRoutineGoalShape(r).weeklyTarget||1);
+  box.innerHTML=vals.map((v,m)=>{
+    const h=Math.max(v.avg>0?5:2,Math.round(v.avg/max*100));
+    return `<div class="routine-month-col" title="${year}년 ${m+1}월 · 주당 평균 ${v.avg}회 · 목표 대비 ${v.rate}%">
+      <div class="routine-month-val">${v.avg}</div>
+      <div class="routine-month-track"><div class="routine-month-bar" style="height:${h}%"></div></div>
+      <div class="routine-month-label">${m+1}월</div>
+    </div>`;
+  }).join('');
+}
+
+let routineDetailYear=null;
 function renderRoutineDetail(routineId){
   const r = getRoutine(routineId);
   if(!r) return;
   document.getElementById("routineDetailTitle").textContent = `${r.icon} ${r.name} 전체 기록`;
 
+  // 날짜 기준 최신순으로 고정. 입력 순서와 무관함.
   const entries = (r.entries||[]).slice().sort((a,b)=> b.date.localeCompare(a.date));
   const successCount = entries.filter(e=>routineSuccess(r,e)).length;
   const rate = entries.length ? Math.round(successCount/entries.length*100) : 0;
+  const g=ensureRoutineGoalShape(r);
   document.getElementById("routineDetailStats").innerHTML = `
     <div class="retro-stat"><b>${routineStreak(r)}</b><span>연속일</span></div>
-    <div class="retro-stat"><b>${entries.length}</b><span>총 기록일</span></div>
-    <div class="retro-stat"><b>${rate}%</b><span>달성률</span></div>`;
-  const g=ensureRoutineGoalShape(r);
+    <div class="retro-stat"><b>${successCount}</b><span>총 달성일</span></div>
+    <div class="retro-stat"><b>${rate}%</b><span>기록 중 달성률</span></div>`;
   document.getElementById("routineDetailMotivation").textContent = motivationText(r);
   document.getElementById("routineDetailGoalSummary").textContent = g.configured ? `주 ${g.weeklyTarget}회 목표` : "목표 미설정";
-  document.getElementById("routineDetailHeatmap").innerHTML = routineMiniHeatmapHtml(r,84);
+
+  const now=new Date(); now.setHours(0,0,0,0);
+  const thisWeek=routineWeekStat(r,now);
+  const prevRef=new Date(now); prevRef.setDate(prevRef.getDate()-7);
+  const lastWeek=routineWeekStat(r,prevRef);
+  let fourSum=0;
+  for(let i=0;i<4;i++){ const d=new Date(now); d.setDate(d.getDate()-7*i); fourSum+=routineWeekStat(r,d).count; }
+  const fourAvg=Math.round((fourSum/4)*10)/10;
+  const monthStat=routineMonthWeekAverage(r,now.getFullYear(),now.getMonth());
+  document.getElementById('routinePeriodStats').innerHTML=`
+    <div class="period-stat-card"><span>이번 주</span><b>${thisWeek.count}/${thisWeek.target}회</b><em>${thisWeek.rate}%</em></div>
+    <div class="period-stat-card"><span>지난주</span><b>${lastWeek.count}/${lastWeek.target}회</b><em>${lastWeek.rate}%</em></div>
+    <div class="period-stat-card"><span>최근 4주 평균</span><b>${fourAvg}회/주</b><em>목표 ${g.weeklyTarget}회</em></div>
+    <div class="period-stat-card"><span>이번 달 평균</span><b>${monthStat.avg}회/주</b><em>목표 대비 ${monthStat.rate}%</em></div>`;
+
+  const years=routineYearsWithData(r);
+  if(!routineDetailYear || !years.includes(routineDetailYear)) routineDetailYear=years[0];
+  const ysel=document.getElementById('routineYearSelect');
+  ysel.innerHTML=years.map(y=>`<option value="${y}">${y}년</option>`).join('');
+  ysel.value=String(routineDetailYear);
+  ysel.onchange=()=>{ routineDetailYear=parseInt(ysel.value); renderRoutineYearGrid(r,routineDetailYear); renderRoutineMonthChart(r,routineDetailYear); };
+  renderRoutineYearGrid(r,routineDetailYear);
+  renderRoutineMonthChart(r,routineDetailYear);
 
   const editDate = document.getElementById("routineEditDate");
   editDate.value = dkey(new Date());
@@ -956,12 +1057,22 @@ function renderRoutineDetail(routineId){
   };
 
   const list = document.getElementById("routineEntryList");
-  list.innerHTML = entries.length ? entries.map(e => `
-    <div class="retro-line routine-entry-row">
-      <span class="rl-title">${fmtDate(e.date)}${routineSuccess(r,e) ? ' <span class="pill pill-done">달성</span>' : ""}</span>
-      <span>${escapeHtml(routineValueLabel(r,e))}</span>
-      <button class="del" data-del-date="${e.date}">삭제</button>
-    </div>`).join("") : `<p class="empty-hint sans">아직 기록이 없어요.</p>`;
+  if(!entries.length){
+    list.innerHTML=`<p class="empty-hint sans">아직 기록이 없어요.</p>`;
+  }else{
+    const groups={};
+    entries.forEach(e=>{ const k=e.date.slice(0,7); (groups[k] ||= []).push(e); });
+    list.innerHTML=Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(month=>{
+      const [yy,mm]=month.split('-');
+      return `<div class="routine-month-group"><div class="routine-month-heading">${yy}년 ${parseInt(mm)}월</div>${groups[month].map(e=>`
+        <div class="retro-line routine-entry-row">
+          <span class="routine-entry-dot ${routineSuccess(r,e)?'done':''}"></span>
+          <span class="rl-title">${fmtDate(e.date)}${routineSuccess(r,e) ? ' <span class="pill pill-done">달성</span>' : ''}</span>
+          <span>${escapeHtml(routineValueLabel(r,e))}</span>
+          <button class="del" data-del-date="${e.date}">삭제</button>
+        </div>`).join('')}</div>`;
+    }).join('');
+  }
   list.querySelectorAll("[data-del-date]").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
       deleteRoutineEntry(routineId, btn.dataset.delDate);
