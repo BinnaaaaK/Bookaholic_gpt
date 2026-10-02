@@ -410,7 +410,7 @@ button:disabled{ opacity:.4; cursor:default; }
 
 /* ---------- Home screen ---------- */
 #homeScreen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 24px; }
-.home-wrap{ max-width:520px; width:100%; text-align:center; }
+.home-wrap{ max-width:520px; width:100%; margin-left:auto; margin-right:auto; text-align:center; }
 .home-eyebrow{
   font-size:12.5px; font-weight:700; color:var(--cloth); letter-spacing:.5px;
   text-transform:uppercase; margin:0 0 10px;
@@ -702,8 +702,9 @@ button.del:hover{ color:var(--danger); }
 }
 .mbo-overview-heatmap{
   grid-template-rows:repeat(7, 11px); grid-auto-flow:column; grid-auto-columns:11px;
-  gap:3px; overflow-x:auto; padding:4px 0 2px;
+  gap:3px; overflow-x:auto; padding:4px 0 2px; justify-content:center;
 }
+.mbo-overview-card .heatmap-legend{ justify-content:center !important; }
 .mbo-card.needs-goal{ border-style:dashed; }
 .mbo-card.needs-goal .mbo-sub{ color:var(--gold); }
 .bridge-progress-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:0 0 18px; }
@@ -731,8 +732,8 @@ button.del:hover{ color:var(--danger); }
 .motivation-card{ display:flex; flex-direction:column; gap:5px; border-color:var(--cloth-dim); background:var(--cloth-bg); }
 .motivation-kicker{ color:var(--cloth); font-size:11px; font-weight:700; }
 .motivation-card strong{ font-size:14px; line-height:1.55; }
-.detail-routine-heatmap{ grid-template-rows:repeat(7,11px); grid-auto-flow:column; grid-auto-columns:11px; gap:3px; overflow-x:auto; }
-.life-retro-heatmap{ grid-template-rows:repeat(7,11px); grid-auto-flow:column; grid-auto-columns:11px; gap:3px; min-width:max-content; }
+.detail-routine-heatmap{ grid-template-rows:repeat(7,11px); grid-auto-flow:column; grid-auto-columns:11px; gap:3px; overflow-x:auto; justify-content:center; }
+.life-retro-heatmap{ grid-template-rows:repeat(7,11px); grid-auto-flow:column; grid-auto-columns:11px; gap:3px; width:max-content; margin-left:auto; margin-right:auto; }
 .life-goal-row{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:13px 0; border-bottom:1px solid var(--line); text-align:left; }
 .life-goal-row:last-child{ border-bottom:none; }
 .life-goal-row>div{ display:flex; flex-direction:column; gap:4px; min-width:0; }
@@ -748,4 +749,17 @@ button.del:hover{ color:var(--danger); }
   .bridge-stat b{ font-size:17px; }
   .goal-card,.goal-setup-card,.motivation-card{ padding:15px; }
   .life-goal-row{ align-items:flex-start; }
+}
+
+/* ---------- Centering patch for MBO / bridge / detail screens ---------- */
+#bridgeScreen, #routineDetailScreen, #lifeRetroScreen{ width:100%; }
+#bridgeScreen .home-wrap, #routineDetailScreen .home-wrap, #lifeRetroScreen .home-wrap{
+  margin-left:auto; margin-right:auto; padding:52px 24px 70px;
+}
+#bridgeScreen .reward-card, #routineDetailScreen .reward-card, #lifeRetroScreen .reward-card,
+#bridgeScreen .goal-card, #bridgeScreen .goal-setup-card, #bridgeScreen .motivation-card{
+  width:100%; margin-left:auto; margin-right:auto;
+}
+@media (max-width:560px){
+  #bridgeScreen .home-wrap, #routineDetailScreen .home-wrap, #lifeRetroScreen .home-wrap{ padding:34px 16px 60px; }
 }
