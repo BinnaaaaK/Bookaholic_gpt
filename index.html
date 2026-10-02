@@ -27,16 +27,36 @@
     <p class="home-sub">카테고리를 눌러서 기록해 보세요.</p>
 
     <div class="mbo-overview-card">
-      <div class="rc-head">
-        <h3>나의 생활 그리드</h3>
-        <span class="rc-sub" id="mboTodayScore"></span>
+      <div class="contrib-head">
+        <div>
+          <h3 id="mboOverviewTitle">나의 생활 그리드</h3>
+          <span class="rc-sub" id="mboTodayScore"></span>
+        </div>
+        <select id="mboOverviewYearSelect" class="year-select sans"></select>
       </div>
-      <p class="rc-note" style="margin-top:0;">설정한 MBO를 많이 달성한 날일수록 진하게 표시돼요. 독서는 그날 독서 기록이 있으면 달성으로 계산해요.</p>
-      <div class="heatmap-grid mbo-overview-heatmap" id="mboOverviewHeatmap"></div>
-      <div class="heatmap-legend sans" style="justify-content:flex-end; margin-top:8px;">
+      <p class="rc-note" style="margin-top:0;">설정한 MBO를 많이 달성한 날일수록 진하게 표시돼요. 기록이 시작되기 전 날짜는 평균 계산에서 제외해요.</p>
+
+      <div class="mbo-year-summary" id="mboYearSummary"></div>
+
+      <div class="contrib-scroll mbo-contrib-scroll">
+        <div class="contrib-inner">
+          <div class="contrib-months" id="mboOverviewMonths"></div>
+          <div class="contrib-body">
+            <div class="contrib-days sans"><span></span><span>월</span><span></span><span>수</span><span></span><span>금</span><span></span></div>
+            <div class="contrib-grid" id="mboOverviewHeatmap"></div>
+          </div>
+        </div>
+      </div>
+      <div class="heatmap-legend sans mbo-overview-legend">
         <span>낮음</span>
         <span class="heatmap-cell"></span><span class="heatmap-cell l1"></span><span class="heatmap-cell l2"></span><span class="heatmap-cell l3"></span><span class="heatmap-cell l4"></span>
         <span>높음</span>
+      </div>
+
+      <div class="mbo-all-years">
+        <div class="rc-head"><h3>전체 연도 요약</h3><span class="rc-sub">해가 쌓일수록 비교가 더 의미 있어져요</span></div>
+        <div class="mbo-all-year-stats" id="mboAllYearStats"></div>
+        <div class="mbo-year-list" id="mboYearList"></div>
       </div>
     </div>
 
@@ -231,7 +251,10 @@
 
   <div class="stats-wrap">
     <div class="stat-panel">
-      <h3>최근 7일 독서 시간 <span class="stat-unit">(분)</span></h3>
+      <div class="stat-panel-head">
+        <h3>주간 독서 시간 <span class="stat-unit">(분)</span></h3>
+        <select id="statsWeekSelect" class="year-select sans"></select>
+      </div>
       <div class="bar-chart" id="statsWeek"></div>
     </div>
     <div class="stat-panel">
