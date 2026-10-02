@@ -363,6 +363,121 @@ function mboHeatmapHtml(days){
   }
   return html;
 }
+
+let mboOverviewYear = new Date().getFullYear();
+
+function mboYearsWithData(){
+  const years = new Set([new Date().getFullYear()]);
+  data.books.forEach(b => (b.sessions||[]).forEach(s => { if(s.date) years.add(parseInt(s.date.slice(0,4))); }));
+  (data.routines||[]).forEach(r => {
+    const g = ensureRoutineGoalShape(r);
+    if(g.startedAt) years.add(parseInt(g.startedAt.slice(0,4)));
+    (r.entries||[]).forEach(e => { if(e.date) years.add(parseInt(e.date.slice(0,4))); });
+  });
+  return [...years].filter(Boolean).sort((a,b)=>b-a);
+}
+
+function mboFirstEligibleDate(year){
+  const candidates=[];
+  const y=String(year);
+  data.books.forEach(b => (b.sessions||[]).forEach(s=>{ if(s.date && s.date.startsWith(y)) candidates.push(s.date); }));
+  (data.routines||[]).forEach(r=>{
+    const g=ensureRoutineGoalShape(r);
+    if(g.configured && g.startedAt){
+      if(g.startedAt.slice(0,4) < y) candidates.push(`${year}-01-01`);
+      else if(g.startedAt.startsWith(y)) candidates.push(g.startedAt);
+    }
+    (r.entries||[]).forEach(e=>{ if(e.date && e.date.startsWith(y)) candidates.push(e.date); });
+  });
+  return candidates.length ? candidates.sort()[0] : null;
+}
+
+function mboYearStats(year){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const startKey=mboFirstEligibleDate(year);
+  if(!startKey) return {year, days:0, avg:0, median:0, perfect:0, activeDays:0, startKey:null};
+  const start=parseD(startKey);
+  const yearEnd=new Date(year,11,31);
+  const last=yearEnd>today?today:yearEnd;
+  if(start>last) return {year, days:0, avg:0, median:0, perfect:0, activeDays:0, startKey};
+  const rates=[]; let perfect=0, activeDays=0;
+  for(let d=new Date(start); d<=last; d.setDate(d.getDate()+1)){
+    const sc=mboDayScore(dkey(d));
+    rates.push(sc.rate);
+    if(sc.rate===100) perfect++;
+    if(sc.success>0) activeDays++;
+  }
+  const sorted=rates.slice().sort((a,b)=>a-b);
+  const mid=Math.floor(sorted.length/2);
+  const median=sorted.length ? (sorted.length%2 ? sorted[mid] : Math.round((sorted[mid-1]+sorted[mid])/2)) : 0;
+  const avg=rates.length ? Math.round(rates.reduce((a,b)=>a+b,0)/rates.length) : 0;
+  return {year, days:rates.length, avg, median, perfect, activeDays, startKey};
+}
+
+function renderMboOverview(){
+  const years=mboYearsWithData();
+  const sel=document.getElementById("mboOverviewYearSelect");
+  if(!years.includes(mboOverviewYear)) mboOverviewYear=years[0];
+  const signature=years.join(",");
+  if(sel.dataset.filled!==signature){
+    sel.innerHTML=years.map(y=>`<option value="${y}">${y}년</option>`).join("");
+    sel.dataset.filled=signature;
+  }
+  sel.value=String(mboOverviewYear);
+
+  const year=mboOverviewYear;
+  const jan1=new Date(year,0,1);
+  const start=new Date(jan1); start.setDate(start.getDate()-jan1.getDay());
+  const dec31=new Date(year,11,31);
+  const today=new Date(); today.setHours(0,0,0,0);
+  const firstEligible=mboFirstEligibleDate(year);
+  let cells="", i=0; const monthAt={};
+  for(const d=new Date(start); d<=dec31; d.setDate(d.getDate()+1),i++){
+    if(d<jan1){ cells += `<div class="heatmap-cell empty"></div>`; continue; }
+    if(d.getDate()===1) monthAt[Math.floor(i/7)]=(d.getMonth()+1)+"월";
+    const key=dkey(d);
+    const isFuture=d>today;
+    const isBeforeData=firstEligible && key<firstEligible;
+    const noDataYet=!firstEligible;
+    if(isFuture || isBeforeData || noDataYet){
+      const why=isFuture?"미래 날짜":(noDataYet?"아직 기록 없음":"기록 시작 전");
+      cells += `<div class="heatmap-cell mbo-unavailable" title="${key} · ${why}"></div>`;
+    }else{
+      const sc=mboDayScore(key);
+      cells += `<div class="heatmap-cell ${heatLevelFromRate(sc.rate)}" title="${key} · ${sc.success}/${sc.total} 달성 (${sc.rate}%)"></div>`;
+    }
+  }
+  const cols=Math.ceil(i/7); let months="";
+  for(let c=0;c<cols;c++) months += `<span>${monthAt[c]||""}</span>`;
+  document.getElementById("mboOverviewHeatmap").innerHTML=cells;
+  document.getElementById("mboOverviewMonths").innerHTML=months;
+
+  const st=mboYearStats(year);
+  document.getElementById("mboOverviewTitle").textContent=`${year}년 나의 생활 그리드`;
+  document.getElementById("mboYearSummary").innerHTML=st.days ? `
+    <div><b>${st.avg}%</b><span>연평균 달성률</span></div>
+    <div><b>${st.median}%</b><span>일별 중앙값</span></div>
+    <div><b>${st.activeDays}</b><span>한 칸 이상 채운 날</span></div>
+    <div><b>${st.perfect}</b><span>모두 채운 날</span></div>` : `
+    <div class="mbo-no-year-data">${year}년에는 아직 계산할 기록이 없어요.</div>`;
+
+  const all=years.map(mboYearStats).filter(x=>x.days>0);
+  const avgs=all.map(x=>x.avg).sort((a,b)=>a-b);
+  const overallAvg=avgs.length ? Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length) : 0;
+  const mid=Math.floor(avgs.length/2);
+  const overallMedian=avgs.length ? (avgs.length%2?avgs[mid]:Math.round((avgs[mid-1]+avgs[mid])/2)) : 0;
+  document.getElementById("mboAllYearStats").innerHTML=`
+    <div><b>${overallAvg}%</b><span>연도별 평균의 평균</span></div>
+    <div><b>${overallMedian}%</b><span>연도별 평균의 중앙값</span></div>
+    <div><b>${all.length}</b><span>기록된 연도</span></div>`;
+  document.getElementById("mboYearList").innerHTML=all.length
+    ? all.map(x=>`<button type="button" class="mbo-year-chip ${x.year===year?"active":""}" data-mbo-year="${x.year}"><b>${x.year}</b><span>평균 ${x.avg}% · 중앙값 ${x.median}%</span></button>`).join("")
+    : `<span class="rc-note">기록이 쌓이면 연도별 비교가 여기에 표시돼요.</span>`;
+  document.querySelectorAll("[data-mbo-year]").forEach(btn=>btn.onclick=()=>{
+    mboOverviewYear=parseInt(btn.dataset.mboYear);
+    renderMboOverview();
+  });
+}
 function motivationText(r){
   const g=ensureRoutineGoalShape(r);
   if(!g.configured) return "큰 계획보다 먼저, 내가 계속할 수 있는 작은 기준 하나를 정해보세요.";
@@ -654,7 +769,7 @@ function renderMboMain(){
   const todayKey=dkey(new Date());
   const todayScore=mboDayScore(todayKey);
   document.getElementById("mboTodayScore").textContent = `오늘 ${todayScore.success}/${todayScore.total} · ${todayScore.rate}%`;
-  document.getElementById("mboOverviewHeatmap").innerHTML = mboHeatmapHtml(84);
+  renderMboOverview();
 
   let html = `
     <div class="mbo-card" data-mbo="reading">
@@ -1049,17 +1164,80 @@ function barChartHtml(items){
 }
 
 let statsMonthYear = new Date().getFullYear();
+let statsWeekOffset = 0; // 0=이번 주, 1=지난주, 2=지지난주 ...
+
+function startOfWeekMonday(baseDate){
+  const d = new Date(baseDate);
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() - ((d.getDay()+6)%7));
+  return d;
+}
+
+function shortMonthDay(d){
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
+function weekMonthLabel(monday){
+  // 목요일이 속한 달을 해당 주의 대표 월로 사용함.
+  // 예: 8/31~9/6 → 9월 1주, 9/28~10/4 → 10월 1주
+  const anchor = new Date(monday);
+  anchor.setDate(anchor.getDate()+3);
+  const year = anchor.getFullYear();
+  const month = anchor.getMonth();
+
+  const first = new Date(year, month, 1);
+  first.setHours(0,0,0,0);
+  const firstWeekMonday = startOfWeekMonday(first);
+  const weekNo = Math.floor((monday - firstWeekMonday) / 604800000) + 1;
+  return `${month+1}월 ${weekNo}주`;
+}
+
+function buildWeekOptionLabel(offset, monday){
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate()+6);
+  const range = `${shortMonthDay(monday)}~${shortMonthDay(sunday)}`;
+  if(offset === 0) return `이번 주 · ${range}`;
+  if(offset === 1) return `지난주 · ${range}`;
+  if(offset === 2) return `지지난주 · ${range}`;
+  return `${weekMonthLabel(monday)} · ${range}`;
+}
+
 function renderStats(){
   const dayNames = ["일","월","화","수","목","금","토"];
   const byDate = {};
   data.books.flatMap(b=>b.sessions||[]).forEach(s=>{ byDate[s.date] = (byDate[s.date]||0) + s.minutes; });
-  const week = [];
-  for(let i=6;i>=0;i--){
-    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-i);
-    const key = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-    week.push({ label: i===0 ? "오늘" : dayNames[d.getDay()], value: byDate[key]||0 });
+
+  // 주간 선택: 이번 주부터 과거 16주까지
+  const weekSelect = document.getElementById("statsWeekSelect");
+  if(weekSelect){
+    const thisMonday = startOfWeekMonday(new Date());
+    const optionHtml = [];
+    for(let offset=0; offset<16; offset++){
+      const monday = new Date(thisMonday);
+      monday.setDate(monday.getDate() - offset*7);
+      optionHtml.push(`<option value="${offset}">${buildWeekOptionLabel(offset, monday)}</option>`);
+    }
+    if(weekSelect.dataset.filled !== "16-weeks-v1"){
+      weekSelect.innerHTML = optionHtml.join("");
+      weekSelect.dataset.filled = "16-weeks-v1";
+    }
+    weekSelect.value = String(statsWeekOffset);
+
+    const selectedMonday = new Date(thisMonday);
+    selectedMonday.setDate(selectedMonday.getDate() - statsWeekOffset*7);
+    const week = [];
+    for(let i=0;i<7;i++){
+      const d = new Date(selectedMonday);
+      d.setDate(d.getDate()+i);
+      const key = dkey(d);
+      const isToday = key === todayStr();
+      week.push({
+        label: isToday ? "오늘" : `${dayNames[d.getDay()]} ${d.getDate()}`,
+        value: byDate[key]||0
+      });
+    }
+    document.getElementById("statsWeek").innerHTML = barChartHtml(week);
   }
-  document.getElementById("statsWeek").innerHTML = barChartHtml(week);
 
   const myEl = document.getElementById("statsMonthYearSelect");
   const myYears = yearsWithData();
@@ -1465,6 +1643,14 @@ document.getElementById("copyShareBtn").addEventListener("click", async ()=>{
 document.getElementById("contribYearSelect").addEventListener("change", (e)=>{
   contribYear = parseInt(e.target.value);
   renderContrib();
+});
+document.getElementById("mboOverviewYearSelect").addEventListener("change", (e)=>{
+  mboOverviewYear = parseInt(e.target.value);
+  renderMboOverview();
+});
+document.getElementById("statsWeekSelect").addEventListener("change", (e)=>{
+  statsWeekOffset = Math.max(0, parseInt(e.target.value)||0);
+  renderStats();
 });
 document.getElementById("statsMonthYearSelect").addEventListener("change", (e)=>{
   statsMonthYear = parseInt(e.target.value);
