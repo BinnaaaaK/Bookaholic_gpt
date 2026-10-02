@@ -112,9 +112,30 @@
     <p class="home-sub" id="routineDetailMotivation"></p>
     <div class="retro-grid" id="routineDetailStats"></div>
 
+    <div class="routine-period-grid" id="routinePeriodStats"></div>
+
+    <div class="reward-card routine-year-card">
+      <div class="rc-head">
+        <div><h3 id="routineYearGridTitle">연간 기록</h3><span class="rc-sub" id="routineDetailGoalSummary"></span></div>
+        <select id="routineYearSelect" class="year-select sans"></select>
+      </div>
+      <div class="contrib-scroll routine-contrib-scroll">
+        <div class="contrib-inner">
+          <div class="contrib-months" id="routineYearMonths"></div>
+          <div class="contrib-body">
+            <div class="contrib-days sans"><span></span><span>월</span><span></span><span>수</span><span></span><span>금</span><span></span></div>
+            <div class="contrib-grid" id="routineDetailHeatmap"></div>
+          </div>
+        </div>
+      </div>
+      <div class="heatmap-legend sans" style="justify-content:center;margin-top:8px;">
+        <span>기록 없음</span><span class="heatmap-cell"></span><span class="heatmap-cell l3"></span><span>달성</span>
+      </div>
+    </div>
+
     <div class="reward-card">
-      <div class="rc-head"><h3>최근 12주</h3><span class="rc-sub" id="routineDetailGoalSummary"></span></div>
-      <div class="heatmap-grid detail-routine-heatmap" id="routineDetailHeatmap"></div>
+      <div class="rc-head"><h3>월별 평균</h3><span class="rc-sub">주당 평균 달성 횟수</span></div>
+      <div class="routine-month-chart" id="routineMonthChart"></div>
     </div>
 
     <div class="reward-card">
