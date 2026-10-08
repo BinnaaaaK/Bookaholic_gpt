@@ -823,3 +823,31 @@ button.del:hover{ color:var(--danger); }
   .routine-month-label{ font-size:8.5px; }
   .routine-entry-row{ grid-template-columns:9px 1fr auto 30px; gap:5px; }
 }
+
+
+/* ---------- Global language picker ---------- */
+.global-language-picker{
+  position:fixed; top:14px; right:16px; z-index:220;
+  display:flex; align-items:center; gap:7px;
+  padding:6px 8px; border:1px solid var(--line); border-radius:10px;
+  background:rgba(30,37,45,.94); box-shadow:var(--shadow-sm);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+}
+.global-language-icon{ font-size:14px; line-height:1; }
+.global-language-select{
+  max-width:150px; border:none; outline:none; cursor:pointer;
+  background:transparent; color:var(--ink); font-size:12px; font-weight:650;
+  font-family:"Avenir Next","Segoe UI","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+}
+.global-language-select option{ background:var(--card); color:var(--ink); }
+html[dir="rtl"] .global-language-picker{ right:auto; left:16px; }
+html[dir="rtl"] body{ direction:rtl; }
+html[dir="rtl"] .global-language-picker,
+html[dir="rtl"] .mbo-wrap,
+html[dir="rtl"] .home-wrap,
+html[dir="rtl"] #library{ direction:rtl; }
+@media (max-width:560px){
+  .global-language-picker{ top:8px; right:8px; padding:5px 7px; }
+  .global-language-select{ max-width:116px; font-size:11px; }
+  #mboScreen .mbo-wrap{ padding-top:72px; }
+}
