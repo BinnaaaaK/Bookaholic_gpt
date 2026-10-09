@@ -362,6 +362,15 @@
   if(!LANGUAGES.some(x=>x.code===currentLang)) currentLang = "ko";
   let observer = null;
   let translating = false;
+  let rescanScheduled = false;
+  function scheduleFullRescan(){
+    if(currentLang === "ko" || rescanScheduled) return;
+    rescanScheduled = true;
+    requestAnimationFrame(()=>{
+      rescanScheduled = false;
+      translateDom(document,false);
+    });
+  }
 
   function pack(lang=currentLang){ return PACKS[lang] || {}; }
   function exactTranslate(text, lang=currentLang){
@@ -462,6 +471,10 @@
     const sel=document.getElementById("globalLanguageSelect"); if(sel && sel.value!==code) sel.value=code;
     translateDom(document,true);
     window.dispatchEvent(new CustomEvent("mbo-language-change",{detail:{language:code}}));
+    // app.js re-renders some panels after the language-change event.
+    // Re-scan after that render so no newly generated Korean UI remains.
+    requestAnimationFrame(()=>translateDom(document,false));
+    setTimeout(()=>translateDom(document,false),30);
   }
   function initSelector(){
     const sel=document.getElementById("globalLanguageSelect"); if(!sel) return;
@@ -483,6 +496,7 @@
           else if(n.nodeType===Node.ELEMENT_NODE) translateDom(n,false);
         }
       }
+      scheduleFullRescan();
     });
     observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["placeholder","title","aria-label"]});
   }
@@ -501,6 +515,6 @@
   }
   function init(){ initSelector(); installDialogTranslation(); translateDom(document,true); initObserver(); }
 
-  window.I18N = { LANGUAGES, setLanguage, getLanguage:()=>currentLang, translateDom, translateText:(s)=>translateCore(s,currentLang), translateHtmlString };
+  window.I18N = { LANGUAGES, setLanguage, getLanguage:()=>currentLang, translateDom, refresh:()=>translateDom(document,false), translateText:(s)=>translateCore(s,currentLang), translateHtmlString };
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
 })();
