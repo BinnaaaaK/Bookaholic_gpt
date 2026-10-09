@@ -1,9 +1,11 @@
 const STORAGE_KEY = "book-library-v1";
+const tr = (text)=> (window.I18N && window.I18N.translateText) ? window.I18N.translateText(String(text)) : String(text);
+const trHtml = (html)=> (window.I18N && window.I18N.translateHtmlString) ? window.I18N.translateHtmlString(html) : html;
 const TIMER_KEY = "book-library-active-timer-v1";
 const BACKUP_META_KEY = "book-library-last-auto-backup-v1";
 const BACKUP_DB_NAME = "mbo-library-backups";
 const BACKUP_STORE = "snapshots";
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const AUTO_BACKUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6시간
 const MAX_AUTO_BACKUPS = 8;
 let data = { schemaVersion: SCHEMA_VERSION, books: [], baselineBooks: 0 };
@@ -67,6 +69,9 @@ function escapeHtml(str){
   div.textContent = str || "";
   return div.innerHTML;
 }
+function escapeAttr(str){ return escapeHtml(String(str ?? "")); }
+function timeToMinutes(v){ if(typeof v!=="string"||!/^\d{2}:\d{2}$/.test(v)) return null; const [h,m]=v.split(":").map(Number); return h*60+m; }
+function minutesToTime(v){ if(v==null||!Number.isFinite(Number(v))) return "—"; let n=Math.round(Number(v)); n=((n%1440)+1440)%1440; return String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0"); }
 function statusLabel(s){
   return ({ wishlist:"읽고 싶음", not_started:"시작 전", in_progress:"읽는 중", done:"완료", dropped:"중단" })[s] || "시작 전";
 }
@@ -123,34 +128,18 @@ function normalizeBook(raw){
 }
 function normalizeRoutine(raw){
   const source = raw && typeof raw === "object" ? raw : {};
-  const def = ROUTINE_DEFS.find(x=>x.id===source.id) || ROUTINE_DEFS[0];
-  const r = {
-    ...source,
-    id:def.id, name:def.name, icon:def.icon, kind:def.kind,
-    goalTime: safeText(source.goalTime || def.goalTime || "", 5),
-    goalTitle:safeText(source.goalTitle,300), goalWhy:safeText(source.goalWhy,1000),
-    weeklyTarget:Math.max(1,Math.min(7,Number.parseInt(source.weeklyTarget)||0)) || null,
-    goalStartedAt:safeDate(source.goalStartedAt),
-    entries:Array.isArray(source.entries) ? source.entries.slice(-5000).map(e=>({
-      ...e, date:safeDate(e&&e.date), done:!!(e&&e.done), note:safeText(e&&e.note,10000), time:safeText(e&&e.time,5)
-    })).filter(e=>e.date) : []
-  };
-  ensureRoutineGoalShape(r);
-  return r;
+  const def = ROUTINE_DEFS.find(x=>x.id===source.id) || null;
+  const isCustom = !def && source.isCustom === true;
+  if(!def && !isCustom) return null;
+  const allowedKinds=new Set(["check","note","time","number"]);
+  const kind=def ? def.kind : (allowedKinds.has(source.kind)?source.kind:"check");
+  const r={...source,id:def?def.id:(safeText(source.id,120)||("custom_"+Date.now()+"_"+Math.random().toString(36).slice(2,7))),name:def?def.name:(safeText(source.name,120)||"새 목표"),icon:def?def.icon:(safeText(source.icon,8)||"🎯"),kind,isCustom:!!isCustom,goalTime:safeText(source.goalTime||(def&&def.goalTime)||"",5),targetValue:Number.isFinite(Number(source.targetValue))?Number(source.targetValue):null,targetMode:source.targetMode==="max"?"max":"min",unit:safeText(source.unit,30),goalTitle:safeText(source.goalTitle,300),goalWhy:safeText(source.goalWhy,1000),weeklyTarget:Math.max(1,Math.min(7,Number.parseInt(source.weeklyTarget)||0))||null,goalStartedAt:safeDate(source.goalStartedAt),entries:Array.isArray(source.entries)?source.entries.slice(-5000).map(e=>({...e,date:safeDate(e&&e.date),done:!!(e&&e.done),note:safeText(e&&e.note,10000),time:safeText(e&&e.time,5),value:Number.isFinite(Number(e&&e.value))?Number(e.value):null})).filter(e=>e.date):[]};
+  ensureRoutineGoalShape(r); return r;
 }
 function normalizeData(raw){
-  const src = raw && typeof raw === "object" ? raw : {};
-  const routinesById = new Map((Array.isArray(src.routines)?src.routines:[]).map(r=>[r&&r.id,r]));
-  return {
-    ...src,
-    schemaVersion: SCHEMA_VERSION,
-    baselineBooks: Math.max(0, Number.parseInt(src.baselineBooks)||0),
-    weeklyGoal: Math.max(1, Number.parseInt(src.weeklyGoal)||2),
-    ownerName: safeText(src.ownerName,200),
-    books: Array.isArray(src.books) ? src.books.slice(0,5000).map(normalizeBook) : [],
-    routines: ROUTINE_DEFS.map(def=>normalizeRoutine(routinesById.get(def.id) || def)),
-    updatedAt: Date.now()
-  };
+  const src=raw&&typeof raw==="object"?raw:{}; const rawRoutines=Array.isArray(src.routines)?src.routines:[]; const routinesById=new Map(rawRoutines.map(r=>[r&&r.id,r])); const builtinIds=new Set(ROUTINE_DEFS.map(x=>x.id));
+  const builtins=ROUTINE_DEFS.map(def=>normalizeRoutine(routinesById.get(def.id)||def)).filter(Boolean); const customs=rawRoutines.filter(r=>r&&r.isCustom===true&&!builtinIds.has(r.id)).map(normalizeRoutine).filter(Boolean);
+  return {...src,schemaVersion:SCHEMA_VERSION,baselineBooks:Math.max(0,Number.parseInt(src.baselineBooks)||0),weeklyGoal:Math.max(1,Number.parseInt(src.weeklyGoal)||2),ownerName:safeText(src.ownerName,200),books:Array.isArray(src.books)?src.books.slice(0,5000).map(normalizeBook):[],routines:[...builtins,...customs],updatedAt:Date.now()};
 }
 function plausibleData(obj){ return !!obj && typeof obj === "object" && Array.isArray(obj.books); }
 
@@ -265,7 +254,15 @@ function routineSuccess(r, entry){
   if(!entry) return false;
   if(r.kind === "check") return !!entry.done;
   if(r.kind === "note") return !!(entry.note && entry.note.trim());
-  if(r.kind === "time") return !!entry.time && entry.time <= r.goalTime;
+  if(r.kind === "time"){
+    if(!entry.time || !r.goalTime) return false; const value=timeToMinutes(entry.time), target=timeToMinutes(r.goalTime); if(value==null||target==null) return false;
+    if(r.id === "sleep_early" && value < 12*60) return false;
+    return value <= target;
+  }
+  if(r.kind === "number"){
+    if(!Number.isFinite(Number(entry.value))||!Number.isFinite(Number(r.targetValue))) return false;
+    return r.targetMode === "max" ? Number(entry.value)<=Number(r.targetValue) : Number(entry.value)>=Number(r.targetValue);
+  }
   return false;
 }
 function routineStreak(r){
@@ -292,6 +289,7 @@ function routineValueLabel(r, entry){
   if(r.kind === "check") return entry.done ? "완료" : "미완료";
   if(r.kind === "note") return entry.note || "—";
   if(r.kind === "time") return entry.time || "—";
+  if(r.kind === "number") return Number.isFinite(Number(entry.value)) ? `${entry.value}${r.unit?" "+r.unit:""}` : "—";
   return "—";
 }
 
@@ -331,6 +329,18 @@ function routineLastNDaysRate(r, days=30){
   }
   return eligible ? Math.round(success/eligible*100) : 0;
 }
+function routineTargetPerformanceBetween(r,start,end){
+  const g=ensureRoutineGoalShape(r); let eligible=0,success=0; const today=new Date(); today.setHours(0,0,0,0); const last=end>today?today:end;
+  for(let d=new Date(start);d<=last;d.setDate(d.getDate()+1)){const key=dkey(d);if(g.startedAt&&key<g.startedAt)continue;eligible++;if(routineSuccess(r,routineEntry(r,key)))success++;}
+  const expected=eligible*(Math.max(1,g.weeklyTarget||1)/7); return {eligible,success,expected,rate:expected>0?Math.min(100,Math.round(success/expected*100)):0};
+}
+function routineMonthPerformance(r,year,month){return routineTargetPerformanceBetween(r,new Date(year,month,1),new Date(year,month+1,0));}
+function routineAverageTimeBetween(r,start,end){const vals=[];(r.entries||[]).forEach(e=>{if(!e.date)return;const d=parseD(e.date);if(d<start||d>end)return;const v=timeToMinutes(e.time);if(v!=null)vals.push(v);});return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null;}
+function routineAverageNumberBetween(r,start,end){const vals=(r.entries||[]).filter(e=>e.date&&parseD(e.date)>=start&&parseD(e.date)<=end&&Number.isFinite(Number(e.value))).map(e=>Number(e.value));return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10:null;}
+function readingMinutesOn(dateKey){return data.books.reduce((sum,b)=>sum+(b.sessions||[]).filter(s=>s.date===dateKey).reduce((a,s)=>a+(s.minutes||0),0),0);}
+function mboTooltipText(dateKey){const sc=mboDayScore(dateKey),lines=[dateKey,`${tr("달성")} ${sc.success}/${sc.total} · ${sc.rate}%`];const rm=readingMinutesOn(dateKey);lines.push(`${rm>0?"✓":"○"} ${tr("독서")}${rm>0?` · ${rm}${tr("분")}`:""}`);(data.routines||[]).forEach(r=>{const g=ensureRoutineGoalShape(r);if(!g.configured||(g.startedAt&&dateKey<g.startedAt))return;const e=routineEntry(r,dateKey),ok=routineSuccess(r,e),detail=e?routineValueLabel(r,e):"";lines.push(`${ok?"✓":"○"} ${tr(r.name)}${detail&&detail!=="—"?` · ${detail}`:""}`);});return lines.join("\n");}
+function routineTooltipText(r,dateKey){const e=routineEntry(r,dateKey),ok=routineSuccess(r,e);return [dateKey,ok?tr("달성"):tr("미달성"),e?routineValueLabel(r,e):tr("기록 없음")].filter(Boolean).join("\n");}
+
 function readingSuccessOn(dateKey){
   return data.books.some(b => (b.sessions||[]).some(s => s.date===dateKey && s.minutes>0));
 }
@@ -359,7 +369,7 @@ function mboHeatmapHtml(days){
   for(let i=days-1;i>=0;i--){
     const d=new Date(today); d.setDate(d.getDate()-i);
     const key=dkey(d), score=mboDayScore(key);
-    html += `<div class="heatmap-cell ${heatLevelFromRate(score.rate)}" title="${key} · ${score.success}/${score.total} 달성 (${score.rate}%)"></div>`;
+    html += `<div class="heatmap-cell ${heatLevelFromRate(score.rate)}" data-tooltip="${escapeAttr(mboTooltipText(key))}"></div>`;
   }
   return html;
 }
@@ -441,10 +451,10 @@ function renderMboOverview(){
     const noDataYet=!firstEligible;
     if(isFuture || isBeforeData || noDataYet){
       const why=isFuture?"미래 날짜":(noDataYet?"아직 기록 없음":"기록 시작 전");
-      cells += `<div class="heatmap-cell mbo-unavailable" title="${key} · ${why}"></div>`;
+      cells += `<div class="heatmap-cell mbo-unavailable" data-tooltip="${escapeAttr(key+" · "+tr(why))}"></div>`;
     }else{
       const sc=mboDayScore(key);
-      cells += `<div class="heatmap-cell ${heatLevelFromRate(sc.rate)}" title="${key} · ${sc.success}/${sc.total} 달성 (${sc.rate}%)"></div>`;
+      cells += `<div class="heatmap-cell ${heatLevelFromRate(sc.rate)}" data-tooltip="${escapeAttr(mboTooltipText(key))}"></div>`;
     }
   }
   const cols=Math.ceil(i/7); let months="";
@@ -547,7 +557,8 @@ function renderRewards(){
   for(let i=13;i>=0;i--){
     const d = new Date(today); d.setDate(d.getDate()-i);
     const on = days.has(dkey(d));
-    sh += `<div class="sticker-cell"><div class="sticker ${on ? "on c"+(d.getDate()%5) : ""} ${i===0 ? "today" : ""}" title="${dkey(d)}">${on ? "★" : ""}</div><span>${i===0 ? "오늘" : d.getDate()}</span></div>`;
+    const readMin=readingMinutesOn(dkey(d));
+    sh += `<div class="sticker-cell"><div class="sticker ${on ? "on c"+(d.getDate()%5) : ""} ${i===0 ? "today" : ""}" data-tooltip="${escapeAttr(`${dkey(d)}\n${on?readMin+tr("분")+" · "+tr("독서"):tr("기록 없음")}`)}">${on ? "★" : ""}</div><span>${i===0 ? "오늘" : d.getDate()}</span></div>`;
   }
   document.getElementById("stickerRow").innerHTML = sh;
 
@@ -763,41 +774,18 @@ function tryRenderSharedFromHash(){
   }
 }
 
+function renderTodayDashboard(){
+  const key=todayStr(),score=mboDayScore(key);document.getElementById("todayDashboardDate").textContent=fmtDate(key);document.getElementById("todayDashboardScore").textContent=score.rate+"%";document.getElementById("todayDashboardFill").style.width=score.rate+"%";
+  const left=Math.max(0,score.total-score.success);document.getElementById("todayDashboardMessage").textContent=score.total>0&&left===0?tr("오늘 모든 목표를 채웠어요! 🎉"):left===1?tr("오늘 한 가지 남았어요."):`${tr("오늘 남은 목표")} ${left}${tr("개")}`;
+  const items=[],rm=readingMinutesOn(key);items.push({id:"reading",icon:"📚",name:tr("독서"),done:rm>0,detail:rm>0?`${rm}${tr("분")}`:tr("아직 기록 없음")});
+  (data.routines||[]).forEach(r=>{const g=ensureRoutineGoalShape(r);if(!g.configured||(g.startedAt&&key<g.startedAt))return;const e=routineEntry(r,key);items.push({id:r.id,icon:r.icon,name:tr(r.name),done:routineSuccess(r,e),detail:e?routineValueLabel(r,e):tr("아직 기록 없음")});});
+  const box=document.getElementById("todayDashboardItems");box.innerHTML=items.map(x=>`<button class="today-dashboard-item ${x.done?"done":""}" data-today-goal="${escapeAttr(x.id)}" type="button"><span class="tdi-main"><span>${x.icon}</span><span><span class="tdi-name">${escapeHtml(x.name)}</span><span class="tdi-detail">${escapeHtml(x.detail)}</span></span></span><span class="tdi-state">${x.done?"✓":"○"}</span></button>`).join("");box.querySelectorAll("[data-today-goal]").forEach(btn=>btn.onclick=()=>btn.dataset.todayGoal==="reading"?showHome():showBridge(btn.dataset.todayGoal));
+}
 function renderMboMain(){
-  const grid = document.getElementById("mboGrid");
-  const totalBooks = totalReadCount();
-  const todayKey=dkey(new Date());
-  const todayScore=mboDayScore(todayKey);
-  document.getElementById("mboTodayScore").textContent = `오늘 ${todayScore.success}/${todayScore.total} · ${todayScore.rate}%`;
-  renderMboOverview();
-
-  let html = `
-    <div class="mbo-card" data-mbo="reading">
-      <div class="mbo-icon">📚</div>
-      <div class="mbo-name">독서</div>
-      <div class="mbo-sub">총 ${totalBooks}권 · ${readingSuccessOn(todayKey)?"오늘 기록 ✓":"오늘은 아직"}</div>
-    </div>`;
-  (data.routines||[]).forEach(r=>{
-    const streak = routineStreak(r);
-    const todayOk = routineSuccess(r, routineEntry(r, todayKey));
-    const g=ensureRoutineGoalShape(r);
-    const sub = g.configured
-      ? `${routineWeekSuccessCount(r)}/${g.weeklyTarget}회 · ${todayOk?"오늘 ✓":(streak?`${streak}일 연속`:"오늘은 아직")}`
-      : "목표를 아직 정하지 않았어요 →";
-    html += `
-      <div class="mbo-card ${g.configured?"":"needs-goal"}" data-mbo="${r.id}">
-        <div class="mbo-icon">${r.icon}</div>
-        <div class="mbo-name">${escapeHtml(r.name)}</div>
-        <div class="mbo-sub">${sub}</div>
-      </div>`;
-  });
-  grid.innerHTML = html;
-  grid.querySelectorAll("[data-mbo]").forEach(el=>{
-    el.addEventListener("click", ()=>{
-      const id = el.dataset.mbo;
-      if(id === "reading") showHome(); else showBridge(id);
-    });
-  });
+  const grid=document.getElementById("mboGrid"),totalBooks=totalReadCount(),todayKey=dkey(new Date()),todayScore=mboDayScore(todayKey);document.getElementById("mboTodayScore").textContent=`${tr("오늘")} ${todayScore.success}/${todayScore.total} · ${todayScore.rate}%`;renderTodayDashboard();renderMboOverview();
+  let html=`<div class="mbo-card" data-mbo="reading"><div class="mbo-icon">📚</div><div class="mbo-name">${tr("독서")}</div><div class="mbo-sub">${tr("총")} ${totalBooks}${tr("권")} · ${readingSuccessOn(todayKey)?tr("오늘 기록 ✓"):tr("오늘은 아직")}</div></div>`;
+  (data.routines||[]).forEach(r=>{const streak=routineStreak(r),todayOk=routineSuccess(r,routineEntry(r,todayKey)),g=ensureRoutineGoalShape(r);const sub=g.configured?`${routineWeekSuccessCount(r)}/${g.weeklyTarget}${tr("회")} · ${todayOk?tr("오늘 ✓"):(streak?`${streak}${tr("일 연속")}`:tr("오늘은 아직"))}`:tr("목표를 아직 정하지 않았어요 →");html+=`<div class="mbo-card ${g.configured?"":"needs-goal"}" data-mbo="${escapeAttr(r.id)}"><div class="mbo-icon">${r.icon}</div><div class="mbo-name">${escapeHtml(tr(r.name))}</div><div class="mbo-sub">${sub}</div></div>`;});
+  grid.innerHTML=html;grid.querySelectorAll("[data-mbo]").forEach(el=>el.addEventListener("click",()=>{const id=el.dataset.mbo;if(id==="reading")showHome();else showBridge(id);}));
 }
 
 function routineMiniHeatmapHtml(r, days){
@@ -806,7 +794,7 @@ function routineMiniHeatmapHtml(r, days){
   for(let i=days-1;i>=0;i--){
     const d = new Date(today); d.setDate(d.getDate()-i);
     const ok = routineSuccess(r, routineEntry(r, dkey(d)));
-    cells += `<div class="heatmap-cell ${ok?"l3":""}" title="${dkey(d)}"></div>`;
+    cells += `<div class="heatmap-cell ${ok?"l3":""}" data-tooltip="${escapeAttr(routineTooltipText(r,dkey(d)))}"></div>`;
   }
   return cells;
 }
@@ -834,11 +822,12 @@ function renderBridge(routineId){
     <div class="goal-summary-main">${escapeHtml(g.statement || `${r.name}을(를) 꾸준히 하기`)}</div>
     ${g.reason?`<p class="goal-reason">“${escapeHtml(g.reason)}”</p>`:""}
     <div class="goal-meta-row"><span>주 ${g.weeklyTarget}회</span>${r.kind==="time"?`<span>기준 ${r.goalTime}</span>`:""}<span>${g.startedAt?fmtDate(g.startedAt)+"부터":""}</span></div>
-    <button class="secondary goal-edit-btn" id="openGoalSetupBtn" type="button">목표 수정</button>` : `
+    <button class="secondary goal-edit-btn" id="openGoalSetupBtn" type="button">목표 수정</button>${r.isCustom?`<div class="custom-delete-row"><button class="ghost" id="deleteCustomGoalBtn" type="button">이 목표 삭제</button></div>`:""}` : `
     <p class="goal-empty-title">이 목표를 내 생활에 맞게 구체화해 볼까요?</p>
     <p class="rc-note">세 가지만 정하면 돼요. 무엇을 만들고 싶은지 → 왜 중요한지 → 일주일에 몇 번 할지.</p>
     <button class="home-cta" id="openGoalSetupBtn" type="button">3단계로 목표 만들기 →</button>`;
   document.getElementById("openGoalSetupBtn").onclick = ()=> openGoalSetup(routineId,1);
+  const deleteCustom=document.getElementById("deleteCustomGoalBtn"); if(deleteCustom) deleteCustom.onclick=async()=>{if(!confirm("이 목표와 기록을 모두 삭제할까요? 되돌릴 수 없어요."))return;data.routines=(data.routines||[]).filter(x=>x.id!==r.id);await saveData();showMbo();};
   document.getElementById("goalSetupCloseBtn").onclick = ()=> document.getElementById("goalSetupCard").classList.add("hidden");
 
   document.getElementById("bridgeMotivation").innerHTML = `<span class="motivation-kicker">오늘의 한마디</span><strong>${escapeHtml(motivationText(r))}</strong>`;
@@ -871,13 +860,16 @@ function renderBridge(routineId){
         <span class="rc-sub">${g.configured?`내 기준 ${r.goalTime}`:`추천 기준 ${r.goalTime}`}</span>
       </div>
       <div class="btn-row" style="justify-content:flex-end; margin-top:10px;"><button id="routineActionBtn">저장</button></div>
-      ${entry && entry.time ? `<p class="rc-note">${entry.time <= r.goalTime ? "🎉 오늘 기준을 지켰어요!" : "오늘은 기준보다 늦었어요. 기록한 것만으로도 흐름을 이어갈 수 있어요."}</p>` : ""}`;
+      ${entry && entry.time ? `<p class="rc-note">${routineSuccess(r,entry) ? "🎉 오늘 기준을 지켰어요!" : "오늘은 기준보다 늦었어요. 기록한 것만으로도 흐름을 이어갈 수 있어요."}</p>` : ""}`;
     document.getElementById("routineActionBtn").addEventListener("click", async ()=>{
       const val = document.getElementById("routineTimeInput").value;
       if(!val) return;
       upsertRoutineEntry(routineId, todayKey, { time: val });
       await saveData(); renderBridge(routineId);
     });
+  }else if(r.kind === "number"){
+    widget.innerHTML=`<div class="fetch-row" style="align-items:center;"><input type="number" step="any" id="routineNumberInput" value="${entry&&Number.isFinite(Number(entry.value))?entry.value:""}" style="width:160px;" /><span class="rc-sub">${tr("목표")} ${r.targetMode==="max"?"≤":"≥"} ${r.targetValue??"—"}${r.unit?" "+escapeHtml(r.unit):""}</span></div><div class="btn-row" style="justify-content:flex-end;margin-top:10px;"><button id="routineActionBtn">${tr("저장")}</button></div>`;
+    document.getElementById("routineActionBtn").addEventListener("click",async()=>{const val=Number(document.getElementById("routineNumberInput").value);if(!Number.isFinite(val))return;upsertRoutineEntry(routineId,todayKey,{value:val});await saveData();renderBridge(routineId);});
   }
 }
 
@@ -886,7 +878,7 @@ function openGoalSetup(routineId, step=1){
   const r=getRoutine(routineId); if(!r) return;
   const g=ensureRoutineGoalShape(r);
   if(!goalSetupDraft || goalSetupDraft.routineId!==routineId){
-    goalSetupDraft={routineId, statement:g.statement||"", reason:g.reason||"", weeklyTarget:g.weeklyTarget||3, goalTime:r.goalTime||""};
+    goalSetupDraft={routineId, statement:g.statement||"", reason:g.reason||"", weeklyTarget:g.weeklyTarget||3, goalTime:r.goalTime||"", targetValue:r.targetValue};
   }
   document.getElementById("goalSetupCard").classList.remove("hidden");
   renderGoalSetupStep(step);
@@ -903,11 +895,12 @@ function renderGoalSetupStep(step){
     document.getElementById("goalPrevBtn").onclick=()=>renderGoalSetupStep(1);
     document.getElementById("goalNextBtn").onclick=()=>{ d.reason=document.getElementById("goalReasonInput").value.trim(); renderGoalSetupStep(3); };
   }else{
-    box.innerHTML=`<h3>현실적으로 얼마나 자주 할까요?</h3><p class="rc-note">처음에는 조금 쉬운 기준이 좋습니다. 달성한 경험을 쌓은 뒤 언제든 높일 수 있어요.</p><div class="goal-frequency-row"><span>일주일에</span><input type="number" id="goalWeeklyInput" min="1" max="7" value="${d.weeklyTarget}"><span>번</span></div>${r.kind==="time"?`<div class="goal-frequency-row"><span>${r.id==="wake_early"?"기상":"취침"} 기준</span><input type="time" id="goalTimeSetupInput" value="${d.goalTime||r.goalTime}"></div>`:""}<div class="goal-step-actions"><button class="secondary" id="goalPrevBtn">← 이전</button><button id="goalSaveBtn">이 목표로 시작하기</button></div>`;
+    box.innerHTML=`<h3>현실적으로 얼마나 자주 할까요?</h3><p class="rc-note">처음에는 조금 쉬운 기준이 좋습니다. 달성한 경험을 쌓은 뒤 언제든 높일 수 있어요.</p><div class="goal-frequency-row"><span>일주일에</span><input type="number" id="goalWeeklyInput" min="1" max="7" value="${d.weeklyTarget}"><span>번</span></div>${r.kind==="time"?`<div class="goal-frequency-row"><span>${r.id==="wake_early"?"기상":r.id==="sleep_early"?"취침":"시간"} 기준</span><input type="time" id="goalTimeSetupInput" value="${d.goalTime||r.goalTime}"></div>`:""}${r.kind==="number"?`<div class="goal-frequency-row"><span>숫자 목표</span><input type="number" step="any" id="goalNumberTargetInput" value="${d.targetValue??r.targetValue??""}"><span>${escapeHtml(r.unit||"")}</span></div>`:""}<div class="goal-step-actions"><button class="secondary" id="goalPrevBtn">← 이전</button><button id="goalSaveBtn">이 목표로 시작하기</button></div>`;
     document.getElementById("goalPrevBtn").onclick=()=>renderGoalSetupStep(2);
     document.getElementById("goalSaveBtn").onclick=async()=>{
       d.weeklyTarget=Math.max(1,Math.min(7,parseInt(document.getElementById("goalWeeklyInput").value)||3));
       if(r.kind==="time"){ const t=document.getElementById("goalTimeSetupInput").value; if(t) r.goalTime=t; }
+      if(r.kind==="number"){ const v=Number(document.getElementById("goalNumberTargetInput").value); if(Number.isFinite(v)){r.targetValue=v; d.targetValue=v;} }
       r.goal={configured:true, statement:d.statement||`${r.name}을(를) 꾸준히 하기`, reason:d.reason, weeklyTarget:d.weeklyTarget, startedAt:r.goal&&r.goal.startedAt?r.goal.startedAt:todayStr()};
       goalSetupDraft=null; await saveData(); document.getElementById("goalSetupCard").classList.add("hidden"); renderBridge(r.id);
     };
@@ -955,131 +948,35 @@ function routineMonthWeekAverage(r,year,month){
   return {avg,weeks:weekCount,success:totalSuccess,target,rate:Math.min(100,Math.round(avg/target*100))};
 }
 function renderRoutineYearGrid(r,year){
-  const jan1=new Date(year,0,1), start=new Date(jan1); start.setDate(start.getDate()-jan1.getDay());
-  const dec31=new Date(year,11,31), today=new Date(); today.setHours(0,0,0,0);
-  const g=ensureRoutineGoalShape(r);
-  let cells='',i=0; const monthAt={};
-  for(const d=new Date(start); d<=dec31; d.setDate(d.getDate()+1),i++){
-    if(d<jan1){ cells+=`<div class="heatmap-cell empty"></div>`; continue; }
-    if(d.getDate()===1) monthAt[Math.floor(i/7)]=(d.getMonth()+1)+'월';
-    const key=dkey(d), future=d>today, before=g.startedAt && key<g.startedAt;
-    if(future || before){
-      cells+=`<div class="heatmap-cell mbo-unavailable" title="${key} · ${future?'미래 날짜':'목표 시작 전'}"></div>`;
-    }else{
-      const e=routineEntry(r,key), ok=routineSuccess(r,e);
-      const detail=e ? routineValueLabel(r,e) : '기록 없음';
-      cells+=`<div class="heatmap-cell ${ok?'l3':''}" title="${key} · ${ok?'달성':'미달성'} · ${escapeHtml(detail)}"></div>`;
-    }
-  }
-  const cols=Math.ceil(i/7); let months='';
-  for(let c=0;c<cols;c++) months+=`<span>${monthAt[c]||''}</span>`;
-  document.getElementById('routineDetailHeatmap').innerHTML=cells;
-  document.getElementById('routineYearMonths').innerHTML=months;
-  document.getElementById('routineYearGridTitle').textContent=`${year}년 전체 기록`;
+  const jan1=new Date(year,0,1),start=new Date(jan1);start.setDate(start.getDate()-jan1.getDay());const dec31=new Date(year,11,31),today=new Date();today.setHours(0,0,0,0);const g=ensureRoutineGoalShape(r);let cells='',i=0;const monthAt={};
+  for(const d=new Date(start);d<=dec31;d.setDate(d.getDate()+1),i++){if(d<jan1){cells+=`<div class="heatmap-cell empty"></div>`;continue;}if(d.getDate()===1)monthAt[Math.floor(i/7)]=(d.getMonth()+1)+'월';const key=dkey(d),future=d>today,before=g.startedAt&&key<g.startedAt;if(future||before){cells+=`<div class="heatmap-cell mbo-unavailable" data-tooltip="${escapeAttr(key+" · "+tr(future?"미래 날짜":"목표 시작 전"))}"></div>`;}else{const e=routineEntry(r,key),ok=routineSuccess(r,e);cells+=`<div class="heatmap-cell ${ok?'l3':''}" data-tooltip="${escapeAttr(routineTooltipText(r,key))}"></div>`;}}
+  const cols=Math.ceil(i/7);let months='';for(let c=0;c<cols;c++)months+=`<span>${monthAt[c]||''}</span>`;document.getElementById('routineDetailHeatmap').innerHTML=cells;document.getElementById('routineYearMonths').innerHTML=months;document.getElementById('routineYearGridTitle').textContent=`${year}년 전체 기록`;
 }
 function renderRoutineMonthChart(r,year){
-  const box=document.getElementById('routineMonthChart');
-  const vals=Array.from({length:12},(_,m)=>routineMonthWeekAverage(r,year,m));
-  const max=Math.max(1,...vals.map(v=>v.avg),ensureRoutineGoalShape(r).weeklyTarget||1);
-  box.innerHTML=vals.map((v,m)=>{
-    const h=Math.max(v.avg>0?5:2,Math.round(v.avg/max*100));
-    return `<div class="routine-month-col" title="${year}년 ${m+1}월 · 주당 평균 ${v.avg}회 · 목표 대비 ${v.rate}%">
-      <div class="routine-month-val">${v.avg}</div>
-      <div class="routine-month-track"><div class="routine-month-bar" style="height:${h}%"></div></div>
-      <div class="routine-month-label">${m+1}월</div>
-    </div>`;
-  }).join('');
+  const box=document.getElementById('routineMonthChart'),sub=document.getElementById('routineMonthChartSub');let vals=[],max=1;
+  if(r.kind==="time"){vals=Array.from({length:12},(_,m)=>({value:routineMonthPerformance(r,year,m).rate,label:(m+1)+tr("월")}));max=100;if(sub)sub.textContent=tr("목표 시각 달성률");}
+  else if(r.kind==="number"){vals=Array.from({length:12},(_,m)=>{const v=routineAverageNumberBetween(r,new Date(year,m,1),new Date(year,m+1,0));return {value:v??0,label:(m+1)+tr("월")};});max=Math.max(1,...vals.map(v=>v.value),Number(r.targetValue)||0);if(sub)sub.textContent=tr("월 평균 기록값");}
+  else{vals=Array.from({length:12},(_,m)=>({value:routineMonthWeekAverage(r,year,m).avg,label:(m+1)+tr("월")}));max=Math.max(1,...vals.map(v=>v.value),ensureRoutineGoalShape(r).weeklyTarget||1);if(sub)sub.textContent=tr("주당 평균 달성 횟수");}
+  box.innerHTML=vals.map((v,m)=>{const h=Math.max(v.value>0?5:2,Math.round(v.value/max*100));const display=r.kind==="time"?`${v.value}%`:r.kind==="number"?`${v.value}${r.unit?" "+escapeHtml(r.unit):""}`:v.value;return `<div class="routine-month-col" data-tooltip="${escapeAttr(`${year}${tr("년")} ${m+1}${tr("월")} · ${display}`)}"><div class="routine-month-val">${display}</div><div class="routine-month-track"><div class="routine-month-bar" style="height:${h}%"></div></div><div class="routine-month-label">${v.label}</div></div>`;}).join('');
 }
 
 let routineDetailYear=null;
+function routinePeriodCardsHtml(r){
+  const now=new Date();now.setHours(0,0,0,0);const thisStart=startOfWeek(now),thisEnd=new Date(thisStart);thisEnd.setDate(thisEnd.getDate()+6);const prevEnd=new Date(thisStart);prevEnd.setDate(prevEnd.getDate()-1);const prevStart=new Date(prevEnd);prevStart.setDate(prevStart.getDate()-6);const monthStart=new Date(now.getFullYear(),now.getMonth(),1),monthEnd=new Date(now.getFullYear(),now.getMonth()+1,0);const g=ensureRoutineGoalShape(r),perf=routineTargetPerformanceBetween(r,monthStart,monthEnd);
+  if(r.kind==="time"){const a1=routineAverageTimeBetween(r,thisStart,thisEnd),a0=routineAverageTimeBetween(r,prevStart,prevEnd),w=routineTargetPerformanceBetween(r,thisStart,thisEnd);return `<div class="period-stat-card"><span>${tr("이번 주 평균")}</span><b>${minutesToTime(a1)}</b><em>${tr("목표")} ${r.goalTime||"—"}</em></div><div class="period-stat-card"><span>${tr("지난주 평균")}</span><b>${minutesToTime(a0)}</b><em></em></div><div class="period-stat-card"><span>${tr("이번 주 달성률")}</span><b>${w.rate}%</b><em>${w.success}${tr("일 달성")}</em></div><div class="period-stat-card"><span>${tr("이번 달 달성률")}</span><b>${perf.rate}%</b><em>${perf.success}${tr("일 달성")}</em></div>`;}
+  if(r.kind==="number"){const a1=routineAverageNumberBetween(r,thisStart,thisEnd),a0=routineAverageNumberBetween(r,prevStart,prevEnd),am=routineAverageNumberBetween(r,monthStart,monthEnd),unit=r.unit?` ${escapeHtml(r.unit)}`:"";return `<div class="period-stat-card"><span>${tr("이번 주 평균")}</span><b>${a1==null?"—":a1+unit}</b><em>${tr("목표")} ${r.targetMode==="max"?"≤":"≥"} ${r.targetValue??"—"}${unit}</em></div><div class="period-stat-card"><span>${tr("지난주 평균")}</span><b>${a0==null?"—":a0+unit}</b><em></em></div><div class="period-stat-card"><span>${tr("이번 달 평균")}</span><b>${am==null?"—":am+unit}</b><em>${perf.success}${tr("일 달성")}</em></div><div class="period-stat-card"><span>${tr("이번 달 달성률")}</span><b>${perf.rate}%</b><em>${tr("목표 기준")}</em></div>`;}
+  const thisWeek=routineWeekStat(r,now),prevRef=new Date(now);prevRef.setDate(prevRef.getDate()-7);const lastWeek=routineWeekStat(r,prevRef);let fourSum=0;for(let i=0;i<4;i++){const d=new Date(now);d.setDate(d.getDate()-7*i);fourSum+=routineWeekStat(r,d).count;}const fourAvg=Math.round((fourSum/4)*10)/10,monthStat=routineMonthWeekAverage(r,now.getFullYear(),now.getMonth());
+  return `<div class="period-stat-card"><span>${tr("이번 주")}</span><b>${thisWeek.count}/${thisWeek.target}${tr("회")}</b><em>${thisWeek.rate}%</em></div><div class="period-stat-card"><span>${tr("지난주")}</span><b>${lastWeek.count}/${lastWeek.target}${tr("회")}</b><em>${lastWeek.rate}%</em></div><div class="period-stat-card"><span>${tr("최근 4주 평균")}</span><b>${fourAvg}${tr("회/주")}</b><em>${r.kind==="note"?tr("작성"):tr("달성")}</em></div><div class="period-stat-card"><span>${tr("이번 달 평균")}</span><b>${monthStat.avg}${tr("회/주")}</b><em>${tr("목표 대비")} ${monthStat.rate}%</em></div>`;
+}
+
 function renderRoutineDetail(routineId){
-  const r = getRoutine(routineId);
-  if(!r) return;
-  document.getElementById("routineDetailTitle").textContent = `${r.icon} ${r.name} 전체 기록`;
-
-  // 날짜 기준 최신순으로 고정. 입력 순서와 무관함.
-  const entries = (r.entries||[]).slice().sort((a,b)=> b.date.localeCompare(a.date));
-  const successCount = entries.filter(e=>routineSuccess(r,e)).length;
-  const rate = entries.length ? Math.round(successCount/entries.length*100) : 0;
-  const g=ensureRoutineGoalShape(r);
-  document.getElementById("routineDetailStats").innerHTML = `
-    <div class="retro-stat"><b>${routineStreak(r)}</b><span>연속일</span></div>
-    <div class="retro-stat"><b>${successCount}</b><span>총 달성일</span></div>
-    <div class="retro-stat"><b>${rate}%</b><span>기록 중 달성률</span></div>`;
-  document.getElementById("routineDetailMotivation").textContent = motivationText(r);
-  document.getElementById("routineDetailGoalSummary").textContent = g.configured ? `주 ${g.weeklyTarget}회 목표` : "목표 미설정";
-
-  const now=new Date(); now.setHours(0,0,0,0);
-  const thisWeek=routineWeekStat(r,now);
-  const prevRef=new Date(now); prevRef.setDate(prevRef.getDate()-7);
-  const lastWeek=routineWeekStat(r,prevRef);
-  let fourSum=0;
-  for(let i=0;i<4;i++){ const d=new Date(now); d.setDate(d.getDate()-7*i); fourSum+=routineWeekStat(r,d).count; }
-  const fourAvg=Math.round((fourSum/4)*10)/10;
-  const monthStat=routineMonthWeekAverage(r,now.getFullYear(),now.getMonth());
-  document.getElementById('routinePeriodStats').innerHTML=`
-    <div class="period-stat-card"><span>이번 주</span><b>${thisWeek.count}/${thisWeek.target}회</b><em>${thisWeek.rate}%</em></div>
-    <div class="period-stat-card"><span>지난주</span><b>${lastWeek.count}/${lastWeek.target}회</b><em>${lastWeek.rate}%</em></div>
-    <div class="period-stat-card"><span>최근 4주 평균</span><b>${fourAvg}회/주</b><em>목표 ${g.weeklyTarget}회</em></div>
-    <div class="period-stat-card"><span>이번 달 평균</span><b>${monthStat.avg}회/주</b><em>목표 대비 ${monthStat.rate}%</em></div>`;
-
-  const years=routineYearsWithData(r);
-  if(!routineDetailYear || !years.includes(routineDetailYear)) routineDetailYear=years[0];
-  const ysel=document.getElementById('routineYearSelect');
-  ysel.innerHTML=years.map(y=>`<option value="${y}">${y}년</option>`).join('');
-  ysel.value=String(routineDetailYear);
-  ysel.onchange=()=>{ routineDetailYear=parseInt(ysel.value); renderRoutineYearGrid(r,routineDetailYear); renderRoutineMonthChart(r,routineDetailYear); };
-  renderRoutineYearGrid(r,routineDetailYear);
-  renderRoutineMonthChart(r,routineDetailYear);
-
-  const editDate = document.getElementById("routineEditDate");
-  editDate.value = dkey(new Date());
-  function renderEditValueInput(){
-    const existing = routineEntry(r, editDate.value);
-    const box = document.getElementById("routineEditValue");
-    if(r.kind === "check"){
-      box.innerHTML = `<select id="routineEditVal"><option value="1" ${existing&&existing.done?"selected":""}>완료</option><option value="0" ${!(existing&&existing.done)?"selected":""}>미완료</option></select>`;
-    }else if(r.kind === "note"){
-      box.innerHTML = `<input type="text" id="routineEditVal" placeholder="내용" value="${escapeHtml((existing&&existing.note)||"")}" />`;
-    }else{
-      box.innerHTML = `<input type="time" id="routineEditVal" value="${(existing&&existing.time)||""}" />`;
-    }
-  }
-  renderEditValueInput();
-  editDate.onchange = renderEditValueInput;
-
-  document.getElementById("routineEditSaveBtn").onclick = async ()=>{
-    const val = document.getElementById("routineEditVal").value;
-    const payload = r.kind === "check" ? { done: val === "1" } : r.kind === "note" ? { note: val } : { time: val };
-    upsertRoutineEntry(routineId, editDate.value, payload);
-    await saveData();
-    renderRoutineDetail(routineId);
-  };
-
-  const list = document.getElementById("routineEntryList");
-  if(!entries.length){
-    list.innerHTML=`<p class="empty-hint sans">아직 기록이 없어요.</p>`;
-  }else{
-    const groups={};
-    entries.forEach(e=>{ const k=e.date.slice(0,7); (groups[k] ||= []).push(e); });
-    list.innerHTML=Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(month=>{
-      const [yy,mm]=month.split('-');
-      return `<div class="routine-month-group"><div class="routine-month-heading">${yy}년 ${parseInt(mm)}월</div>${groups[month].map(e=>`
-        <div class="retro-line routine-entry-row">
-          <span class="routine-entry-dot ${routineSuccess(r,e)?'done':''}"></span>
-          <span class="rl-title">${fmtDate(e.date)}${routineSuccess(r,e) ? ' <span class="pill pill-done">달성</span>' : ''}</span>
-          <span>${escapeHtml(routineValueLabel(r,e))}</span>
-          <button class="del" data-del-date="${e.date}">삭제</button>
-        </div>`).join('')}</div>`;
-    }).join('');
-  }
-  list.querySelectorAll("[data-del-date]").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      deleteRoutineEntry(routineId, btn.dataset.delDate);
-      await saveData();
-      renderRoutineDetail(routineId);
-    });
-  });
+  const r=getRoutine(routineId);if(!r)return;document.getElementById("routineDetailTitle").textContent=`${r.icon} ${r.name} 전체 기록`;const entries=(r.entries||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)),successCount=entries.filter(e=>routineSuccess(r,e)).length,rate=entries.length?Math.round(successCount/entries.length*100):0,g=ensureRoutineGoalShape(r);
+  document.getElementById("routineDetailStats").innerHTML=`<div class="retro-stat"><b>${routineStreak(r)}</b><span>연속일</span></div><div class="retro-stat"><b>${successCount}</b><span>총 달성일</span></div><div class="retro-stat"><b>${rate}%</b><span>기록 중 달성률</span></div>`;document.getElementById("routineDetailMotivation").textContent=motivationText(r);document.getElementById("routineDetailGoalSummary").textContent=g.configured?`주 ${g.weeklyTarget}회 목표`:"목표 미설정";document.getElementById('routinePeriodStats').innerHTML=routinePeriodCardsHtml(r);
+  const years=routineYearsWithData(r);if(!routineDetailYear||!years.includes(routineDetailYear))routineDetailYear=years[0];const ysel=document.getElementById('routineYearSelect');ysel.innerHTML=years.map(y=>`<option value="${y}">${y}년</option>`).join('');ysel.value=String(routineDetailYear);ysel.onchange=()=>{routineDetailYear=parseInt(ysel.value);renderRoutineYearGrid(r,routineDetailYear);renderRoutineMonthChart(r,routineDetailYear);};renderRoutineYearGrid(r,routineDetailYear);renderRoutineMonthChart(r,routineDetailYear);
+  const editDate=document.getElementById("routineEditDate");editDate.value=dkey(new Date());function renderEditValueInput(){const existing=routineEntry(r,editDate.value),box=document.getElementById("routineEditValue");if(r.kind==="check")box.innerHTML=`<select id="routineEditVal"><option value="1" ${existing&&existing.done?"selected":""}>완료</option><option value="0" ${!(existing&&existing.done)?"selected":""}>미완료</option></select>`;else if(r.kind==="note")box.innerHTML=`<input type="text" id="routineEditVal" placeholder="내용" value="${escapeHtml((existing&&existing.note)||"")}" />`;else if(r.kind==="time")box.innerHTML=`<input type="time" id="routineEditVal" value="${(existing&&existing.time)||""}" />`;else box.innerHTML=`<input type="number" step="any" id="routineEditVal" placeholder="${escapeAttr(r.unit||tr("숫자"))}" value="${existing&&Number.isFinite(Number(existing.value))?existing.value:""}" />`;}
+  renderEditValueInput();editDate.onchange=renderEditValueInput;document.getElementById("routineEditSaveBtn").onclick=async()=>{const val=document.getElementById("routineEditVal").value,payload=r.kind==="check"?{done:val==="1"}:r.kind==="note"?{note:val}:r.kind==="time"?{time:val}:{value:Number(val)};if(r.kind==="number"&&!Number.isFinite(payload.value))return;upsertRoutineEntry(routineId,editDate.value,payload);await saveData();renderRoutineDetail(routineId);};
+  const list=document.getElementById("routineEntryList");if(!entries.length)list.innerHTML=`<p class="empty-hint sans">아직 기록이 없어요.</p>`;else{const groups={};entries.forEach(e=>{const k=e.date.slice(0,7);(groups[k]||=[]).push(e);});list.innerHTML=Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(month=>{const [yy,mm]=month.split('-');return `<div class="routine-month-group"><div class="routine-month-heading">${yy}년 ${parseInt(mm)}월</div>${groups[month].map(e=>`<div class="retro-line routine-entry-row"><span class="routine-entry-dot ${routineSuccess(r,e)?'done':''}"></span><span class="rl-title">${fmtDate(e.date)}${routineSuccess(r,e)?' <span class="pill pill-done">달성</span>':''}</span><span>${escapeHtml(routineValueLabel(r,e))}</span><button class="del" data-del-date="${e.date}">삭제</button></div>`).join('')}</div>`;}).join('');}
+  list.querySelectorAll("[data-del-date]").forEach(btn=>btn.addEventListener("click",async()=>{deleteRoutineEntry(routineId,btn.dataset.delDate);await saveData();renderRoutineDetail(routineId);}));
 }
 
 function lifeRetroYears(){
@@ -1088,19 +985,22 @@ function lifeRetroYears(){
   (data.routines||[]).forEach(r=>(r.entries||[]).forEach(x=>ys.add(parseInt(x.date.slice(0,4)))));
   return [...ys].filter(Boolean).sort((a,b)=>b-a);
 }
+function monthMboAverage(year,month){const start=new Date(year,month,1),end=new Date(year,month+1,0),today=new Date();today.setHours(0,0,0,0);const last=end>today?today:end;if(start>last)return 0;let sum=0,n=0;for(let d=new Date(start);d<=last;d.setDate(d.getDate()+1)){sum+=mboDayScore(dkey(d)).rate;n++;}return n?Math.round(sum/n):0;}
+function renderLifeAutoReview(year){const now=new Date(),month=year===now.getFullYear()?now.getMonth():11,prevMonth=month===0?11:month-1,prevYear=month===0?year-1:year,routines=(data.routines||[]).filter(r=>routineGoalConfigured(r)),perf=routines.map(r=>({r,rate:routineTargetPerformanceBetween(r,new Date(year,0,1),new Date(year,11,31)).rate})),best=perf.slice().sort((a,b)=>b.rate-a.rate)[0]||null,weak=perf.slice().sort((a,b)=>a.rate-b.rate)[0]||null,improvements=routines.map(r=>({r,cur:routineMonthPerformance(r,year,month).rate,prev:routineMonthPerformance(r,prevYear,prevMonth).rate})).map(x=>({...x,delta:x.cur-x.prev})).sort((a,b)=>b.delta-a.delta),improved=improvements[0]||null,curOverall=monthMboAverage(year,month),prevOverall=monthMboAverage(prevYear,prevMonth),delta=curOverall-prevOverall;document.getElementById("lifeAutoReviewPeriod").textContent=`${year}${tr("년")} ${month+1}${tr("월")}`;document.getElementById("lifeAutoReviewSummary").textContent=delta>0?`${tr("지난달보다 생활 달성률이")} ${delta}%p ${tr("올랐어요.")}`:delta<0?`${tr("지난달보다 생활 달성률이")} ${Math.abs(delta)}%p ${tr("낮아졌어요. 무리하지 말고 한 가지부터 다시 이어가 보세요.")}`:tr("지난달과 비슷한 흐름이에요. 꾸준함을 유지해 보세요.");const item=(label,obj,value)=>`<div class="auto-review-item"><span>${tr(label)}</span><b>${obj?`${obj.r.icon} ${escapeHtml(tr(obj.r.name))}`:"—"}</b><em>${value}</em></div>`;document.getElementById("lifeAutoReviewGrid").innerHTML=item("가장 잘 지킨 목표",best,best?best.rate+"%":"—")+item("가장 많이 좋아진 목표",improved,improved?(improved.delta>=0?"+":"")+improved.delta+"%p":"—")+item("조금 더 챙겨볼 목표",weak,weak?weak.rate+"%":"—")+`<div class="auto-review-item"><span>${tr("이번 달 생활 달성률")}</span><b>${curOverall}%</b><em>${delta===0?"±0":(delta>0?"+":"")+delta}%p</em></div>`;}
+
 function renderLifeRetro(){
   const sel=document.getElementById("lifeRetroYear");
   const years=lifeRetroYears();
   if(!sel.dataset.filled || sel.dataset.filled!==years.join(",")){
     sel.innerHTML=years.map(y=>`<option value="${y}">${y}년</option>`).join(""); sel.dataset.filled=years.join(",");
   }
-  const year=parseInt(sel.value)||new Date().getFullYear(); sel.value=String(year);
+  const year=parseInt(sel.value)||new Date().getFullYear(); sel.value=String(year); renderLifeAutoReview(year);
   const start=new Date(year,0,1), end=new Date(year,11,31); const today=new Date(); today.setHours(0,0,0,0);
   const last=end>today?today:end;
   let days=0, scoreSum=0, perfect=0, cells="";
   for(let d=new Date(start); d<=last; d.setDate(d.getDate()+1)){
     const key=dkey(d), sc=mboDayScore(key); days++; scoreSum+=sc.rate; if(sc.rate===100) perfect++;
-    cells += `<div class="heatmap-cell ${heatLevelFromRate(sc.rate)}" title="${key} · ${sc.success}/${sc.total} (${sc.rate}%)"></div>`;
+    cells += `<div class="heatmap-cell ${heatLevelFromRate(sc.rate)}" data-tooltip="${escapeAttr(mboTooltipText(key))}"></div>`;
   }
   const avg=days?Math.round(scoreSum/days):0;
   const configured=(data.routines||[]).filter(r=>routineGoalConfigured(r));
@@ -1439,7 +1339,7 @@ function renderContrib(){
     const min = byDate[keyOf(d)] || 0;
     let level = "";
     if(min > 0){ activeDays++; totalMin += min; level = min<=15 ? "l1" : min<=30 ? "l2" : min<=60 ? "l3" : "l4"; }
-    cells += `<div class="heatmap-cell ${level}" title="${keyOf(d)}${min?" · "+min+"분":""}"></div>`;
+    cells += `<div class="heatmap-cell ${level}" data-tooltip="${escapeAttr(`${keyOf(d)}\n${min?min+tr("분")+" · "+tr("독서"):tr("기록 없음")}`)}"></div>`;
   }
   const cols = Math.ceil(i/7);
   let months = "";
@@ -1632,7 +1532,8 @@ function generateReport(){  // PDF (opens print dialog -> save as PDF)
       <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
     </body></html>
   `;
-  const blob = new Blob([html], { type:"text/html" });
+  const localizedHtml = trHtml(html);
+  const blob = new Blob([localizedHtml], { type:"text/html" });
   const url = URL.createObjectURL(blob);
   window.open(url, "_blank");
 }
@@ -1648,51 +1549,52 @@ function downloadBlob(content, filename, type){
 function bookMinutes(b){ return (b.sessions||[]).reduce((a,s)=>a+s.minutes,0); }
 function booksRows(){
   return data.books.map(b=>({
-    "제목": b.title||"", "작가": b.author||"", "출판사": b.publisher||"", "옮긴이": b.translator||"",
-    "상태": statusLabel(b.status), "진행률(%)": pctOf(b), "현재 페이지": b.currentPage||0, "총 페이지": b.totalPages||0,
-    "시작일": b.startDate||"", "완료일": b.endDate||"", "누적 독서시간(분)": bookMinutes(b),
-    "별점": b.rating||"", "장르": (b.genres||[]).join(", "), "이 책에서 얻은 것": b.takeaway||"", "독후감": b.review||""
+    [tr("제목")]: b.title||"", [tr("작가")]: b.author||"", [tr("출판사")]: b.publisher||"", [tr("옮긴이")]: b.translator||"",
+    [tr("상태")]: tr(statusLabel(b.status)), [tr("진행률(%)")]: pctOf(b), [tr("현재 페이지")]: b.currentPage||0, [tr("총 페이지")]: b.totalPages||0,
+    [tr("시작일")]: b.startDate||"", [tr("완료일")]: b.endDate||"", [tr("누적 독서시간(분)")]: bookMinutes(b),
+    [tr("별점")]: b.rating||"", [tr("장르")]: (b.genres||[]).join(", "), [tr("이 책에서 얻은 것")]: b.takeaway||"", [tr("독후감")]: b.review||""
   }));
 }
 function exportXlsx(){
   if(typeof XLSX === "undefined"){ alert("Excel 라이브러리를 불러오지 못했어요. 인터넷 연결을 확인하거나 CSV로 내보내 주세요."); return; }
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(booksRows()), "책 목록");
-  const quotes = data.books.flatMap(b=>(b.quotes||[]).map(q=>({ "책": b.title, "문구": q.text, "페이지": q.page||"" })));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(quotes.length?quotes:[{ "책":"", "문구":"", "페이지":"" }]), "문구");
-  const sessions = data.books.flatMap(b=>(b.sessions||[]).map(s=>({ "책": b.title, "날짜": s.date, "독서시간(분)": s.minutes })));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sessions.length?sessions:[{ "책":"", "날짜":"", "독서시간(분)":"" }]), "독서 기록");
-  XLSX.writeFile(wb, `나의서재-${todayStr()}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(booksRows()), tr("책 목록"));
+  const quotes = data.books.flatMap(b=>(b.quotes||[]).map(q=>({ [tr("책")]: b.title, [tr("문구")]: q.text, [tr("페이지")]: q.page||"" })));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(quotes.length?quotes:[{ [tr("책")]:"", [tr("문구")]:"", [tr("페이지")]:"" }]), tr("문구"));
+  const sessions = data.books.flatMap(b=>(b.sessions||[]).map(s=>({ [tr("책")]: b.title, [tr("날짜")]: s.date, [tr("독서시간(분)")]: s.minutes })));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sessions.length?sessions:[{ [tr("책")]:"", [tr("날짜")]:"", [tr("독서시간(분)")]:"" }]), tr("독서 기록"));
+  XLSX.writeFile(wb, `mbo-library-${todayStr()}.xlsx`);
 }
 function exportCsv(){
   const rows = booksRows();
   const keys = Object.keys(rows[0] || {"제목":""});
   const esc = v => `"${String(v).replace(/"/g,'""')}"`;
   const csv = [keys.map(esc).join(",")].concat(rows.map(r=>keys.map(k=>esc(r[k])).join(","))).join("\r\n");
-  downloadBlob("\uFEFF"+csv, `나의서재-${todayStr()}.csv`, "text/csv;charset=utf-8");
+  downloadBlob("\uFEFF"+csv, `mbo-library-${todayStr()}.csv`, "text/csv;charset=utf-8");
 }
 function exportMarkdown(){
   const doneCount = data.books.filter(b=>b.status==="done").length;
   const total = (data.baselineBooks||0) + doneCount;
   const goalNow = getGoal(total);
-  let md = `# 나의 서재\n\n${goalNow}권 프로젝트 · ${total}/${goalNow}권 (${todayStr()} 기준)\n\n`;
+  const projectLine = tr(`${goalNow}권 읽기 프로젝트`);
+  let md = `# ${tr("나의 서재")}\n\n${projectLine} · ${total}/${goalNow} ${tr("권")} (${todayStr()})\n\n`;
   data.books.forEach(b=>{
-    md += `## ${b.title||"제목 없음"}\n\n`;
-    if(b.author) md += `- 작가: ${b.author}\n`;
-    if(b.publisher) md += `- 출판사: ${b.publisher}\n`;
-    if(b.translator) md += `- 옮긴이: ${b.translator}\n`;
-    md += `- 상태: ${statusLabel(b.status)} (${pctOf(b)}%)\n`;
-    if(b.startDate) md += `- 시작일: ${b.startDate}\n`;
-    if(b.endDate) md += `- 완료일: ${b.endDate}\n`;
-    md += `- 누적 독서시간: ${bookMinutes(b)}분\n`;
-    if(b.rating) md += `- 별점: ${starsHtml(b.rating)}\n`;
-    if((b.genres||[]).length) md += `- 장르: ${b.genres.join(", ")}\n`;
-    if(b.takeaway) md += `- 이 책에서 얻은 것: ${b.takeaway}\n`;
-    md += `\n### 좋았던 문구\n\n`;
-    md += (b.quotes||[]).length ? b.quotes.map(q=>`> ${q.text}${q.page?` (p.${q.page})`:""}\n`).join("\n") : "_기록 없음_\n";
-    md += `\n### 독후감\n\n${b.review||"_작성된 독후감 없음_"}\n\n---\n\n`;
+    md += `## ${b.title||tr("제목 없음")}\n\n`;
+    if(b.author) md += `- ${tr("작가")}: ${b.author}\n`;
+    if(b.publisher) md += `- ${tr("출판사")}: ${b.publisher}\n`;
+    if(b.translator) md += `- ${tr("옮긴이")}: ${b.translator}\n`;
+    md += `- ${tr("상태")}: ${tr(statusLabel(b.status))} (${pctOf(b)}%)\n`;
+    if(b.startDate) md += `- ${tr("시작일")}: ${b.startDate}\n`;
+    if(b.endDate) md += `- ${tr("완료일")}: ${b.endDate}\n`;
+    md += `- ${tr("누적 독서 시간")}: ${tr(`${bookMinutes(b)}분`)}\n`;
+    if(b.rating) md += `- ${tr("별점")}: ${starsHtml(b.rating)}\n`;
+    if((b.genres||[]).length) md += `- ${tr("장르")}: ${b.genres.join(", ")}\n`;
+    if(b.takeaway) md += `- ${tr("이 책에서 얻은 것")}: ${b.takeaway}\n`;
+    md += `\n### ${tr("좋았던 문구")}\n\n`;
+    md += (b.quotes||[]).length ? b.quotes.map(q=>`> ${q.text}${q.page?` (p.${q.page})`:""}\n`).join("\n") : `_${tr("기록 없음")}_\n`;
+    md += `\n### ${tr("독후감")}\n\n${b.review||`_${tr("작성된 독후감이 없어요.")}_`}\n\n---\n\n`;
   });
-  downloadBlob(md, `나의서재-${todayStr()}.md`, "text/markdown;charset=utf-8");
+  downloadBlob(md, `mbo-library-${todayStr()}.md`, "text/markdown;charset=utf-8");
 }
 function handleExport(fmt){
   if(fmt==="pdf") generateReport();
@@ -1726,6 +1628,15 @@ function importData(file){
   };
   reader.readAsText(file);
 }
+
+function renderCustomGoalKindOptions(){const kind=document.getElementById("customGoalKind").value,box=document.getElementById("customGoalKindOptions");if(kind==="time")box.innerHTML=`<div class="custom-kind-options"><label>${tr("목표 시각")}</label><input id="customGoalTime" type="time" value="07:00" /></div>`;else if(kind==="number")box.innerHTML=`<div class="custom-kind-options"><div class="goal-frequency-row"><span>${tr("목표값")}</span><input id="customGoalTargetValue" type="number" step="any" value="1"></div><div class="goal-frequency-row"><span>${tr("단위")}</span><input id="customGoalUnit" placeholder="예: km, ml, 분" style="max-width:120px"></div><div class="goal-frequency-row"><span>${tr("달성 기준")}</span><select id="customGoalTargetMode" class="modal-select"><option value="min">${tr("목표값 이상")}</option><option value="max">${tr("목표값 이하")}</option></select></div></div>`;else box.innerHTML="";}
+function openCustomGoalModal(){document.getElementById("customGoalIcon").value="🎯";document.getElementById("customGoalName").value="";document.getElementById("customGoalKind").value="check";document.getElementById("customGoalWeeklyTarget").value="3";document.getElementById("customGoalReason").value="";renderCustomGoalKindOptions();document.getElementById("customGoalModal").classList.remove("hidden");}
+async function saveCustomGoal(){const name=document.getElementById("customGoalName").value.trim();if(!name){alert("목표 이름을 입력해 주세요.");return;}const kind=document.getElementById("customGoalKind").value,weeklyTarget=Math.max(1,Math.min(7,parseInt(document.getElementById("customGoalWeeklyTarget").value)||3)),r={id:"custom_"+Date.now(),name,icon:document.getElementById("customGoalIcon").value.trim()||"🎯",kind,isCustom:true,entries:[],goalTime:"",targetValue:null,targetMode:"min",unit:"",goal:{configured:true,statement:name,reason:document.getElementById("customGoalReason").value.trim(),weeklyTarget,startedAt:todayStr()}};if(kind==="time")r.goalTime=document.getElementById("customGoalTime").value||"07:00";if(kind==="number"){const v=Number(document.getElementById("customGoalTargetValue").value);if(!Number.isFinite(v)){alert("숫자 목표값을 입력해 주세요.");return;}r.targetValue=v;r.unit=document.getElementById("customGoalUnit").value.trim();r.targetMode=document.getElementById("customGoalTargetMode").value;}data.routines.push(r);await saveData();document.getElementById("customGoalModal").classList.add("hidden");renderMboMain();}
+let tooltipPinned=false;function showGlobalTooltip(target,x,y,pin=false){const tip=document.getElementById("globalTooltip"),text=target&&target.dataset?target.dataset.tooltip:"";if(!tip||!text)return;tip.textContent=text;tip.classList.remove("hidden");tip.classList.toggle("pinned",!!pin);tooltipPinned=!!pin;let left=(x||0)+14,top=(y||0)+14;tip.style.left=left+"px";tip.style.top=top+"px";const rect=tip.getBoundingClientRect(),margin=12;if(rect.right>window.innerWidth-margin)left=Math.max(margin,window.innerWidth-rect.width-margin);if(rect.bottom>window.innerHeight-margin)top=Math.max(margin,(y||0)-rect.height-14);tip.style.left=left+"px";tip.style.top=top+"px";}
+function hideGlobalTooltip(){const tip=document.getElementById("globalTooltip");if(tip){tip.classList.add("hidden");tip.classList.remove("pinned");}tooltipPinned=false;}
+function initGlobalTooltips(){document.addEventListener("mouseover",e=>{const t=e.target.closest&&e.target.closest("[data-tooltip]");if(t&&!tooltipPinned)showGlobalTooltip(t,e.clientX,e.clientY,false);});document.addEventListener("mousemove",e=>{if(tooltipPinned)return;const t=e.target.closest&&e.target.closest("[data-tooltip]");if(t)showGlobalTooltip(t,e.clientX,e.clientY,false);});document.addEventListener("mouseout",e=>{if(tooltipPinned)return;const t=e.target.closest&&e.target.closest("[data-tooltip]");if(t)hideGlobalTooltip();});document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest("[data-tooltip]");if(t){const r=t.getBoundingClientRect();showGlobalTooltip(t,r.left+r.width/2,r.bottom,true);return;}if(tooltipPinned)hideGlobalTooltip();});window.addEventListener("scroll",()=>{if(tooltipPinned)hideGlobalTooltip();},{passive:true});}
+function rerenderVisibleForLanguage(){try{if(!document.getElementById("mboScreen").classList.contains("hidden"))renderMboMain();if(!document.getElementById("bridgeScreen").classList.contains("hidden")&&currentBridgeId)renderBridge(currentBridgeId);if(!document.getElementById("routineDetailScreen").classList.contains("hidden")&&currentRoutineDetailId)renderRoutineDetail(currentRoutineDetailId);if(!document.getElementById("lifeRetroScreen").classList.contains("hidden"))renderLifeRetro();if(!document.getElementById("homeScreen").classList.contains("hidden"))renderHome();if(!document.getElementById("library").classList.contains("hidden"))renderLibrary();}catch(e){console.warn("language rerender skipped",e);}}
+window.addEventListener("mbo-language-change",()=>setTimeout(rerenderVisibleForLanguage,0));document.getElementById("openCustomGoalBtn").addEventListener("click",openCustomGoalModal);document.getElementById("cancelCustomGoalBtn").addEventListener("click",()=>document.getElementById("customGoalModal").classList.add("hidden"));document.getElementById("customGoalKind").addEventListener("change",renderCustomGoalKindOptions);document.getElementById("saveCustomGoalBtn").addEventListener("click",saveCustomGoal);initGlobalTooltips();
 
 document.getElementById("baselineInput").addEventListener("change", async (e)=>{
   data.baselineBooks = Math.max(0, parseInt(e.target.value)||0);
