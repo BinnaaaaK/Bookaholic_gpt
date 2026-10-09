@@ -5,7 +5,7 @@ const TIMER_KEY = "book-library-active-timer-v1";
 const BACKUP_META_KEY = "book-library-last-auto-backup-v1";
 const BACKUP_DB_NAME = "mbo-library-backups";
 const BACKUP_STORE = "snapshots";
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const AUTO_BACKUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6시간
 const MAX_AUTO_BACKUPS = 8;
 let data = { schemaVersion: SCHEMA_VERSION, books: [], baselineBooks: 0 };
@@ -133,13 +133,31 @@ function normalizeRoutine(raw){
   if(!def && !isCustom) return null;
   const allowedKinds=new Set(["check","note","time","number"]);
   const kind=def ? def.kind : (allowedKinds.has(source.kind)?source.kind:"check");
-  const r={...source,id:def?def.id:(safeText(source.id,120)||("custom_"+Date.now()+"_"+Math.random().toString(36).slice(2,7))),name:def?def.name:(safeText(source.name,120)||"새 목표"),icon:def?def.icon:(safeText(source.icon,8)||"🎯"),kind,isCustom:!!isCustom,goalTime:safeText(source.goalTime||(def&&def.goalTime)||"",5),targetValue:Number.isFinite(Number(source.targetValue))?Number(source.targetValue):null,targetMode:source.targetMode==="max"?"max":"min",unit:safeText(source.unit,30),goalTitle:safeText(source.goalTitle,300),goalWhy:safeText(source.goalWhy,1000),weeklyTarget:Math.max(1,Math.min(7,Number.parseInt(source.weeklyTarget)||0))||null,goalStartedAt:safeDate(source.goalStartedAt),entries:Array.isArray(source.entries)?source.entries.slice(-5000).map(e=>({...e,date:safeDate(e&&e.date),done:!!(e&&e.done),note:safeText(e&&e.note,10000),time:safeText(e&&e.time,5),value:Number.isFinite(Number(e&&e.value))?Number(e.value):null})).filter(e=>e.date):[]};
+  const r={...source,id:def?def.id:(safeText(source.id,120)||("custom_"+Date.now()+"_"+Math.random().toString(36).slice(2,7))),name:def?def.name:(safeText(source.name,120)||"새 목표"),icon:def?(safeText(source.icon,32)||def.icon):(safeText(source.icon,32)||"🎯"),kind,isCustom:!!isCustom,goalTime:safeText(source.goalTime||(def&&def.goalTime)||"",5),targetValue:Number.isFinite(Number(source.targetValue))?Number(source.targetValue):null,targetMode:source.targetMode==="max"?"max":"min",unit:safeText(source.unit,30),goalTitle:safeText(source.goalTitle,300),goalWhy:safeText(source.goalWhy,1000),weeklyTarget:Math.max(1,Math.min(7,Number.parseInt(source.weeklyTarget)||0))||null,goalStartedAt:safeDate(source.goalStartedAt),entries:Array.isArray(source.entries)?source.entries.slice(-5000).map(e=>({...e,date:safeDate(e&&e.date),done:!!(e&&e.done),note:safeText(e&&e.note,10000),time:safeText(e&&e.time,5),value:Number.isFinite(Number(e&&e.value))?Number(e.value):null})).filter(e=>e.date):[]};
   ensureRoutineGoalShape(r); return r;
 }
+function legacyRoutineHasUserData(r){
+  if(!r || typeof r!=="object") return false;
+  const hasEntries=Array.isArray(r.entries) && r.entries.some(e=>e && e.date);
+  const g=r.goal && typeof r.goal==="object" ? r.goal : {};
+  const hasConfiguredGoal=g.configured===true || !!safeText(g.statement,300) || !!safeText(g.reason,1000) || !!safeDate(g.startedAt);
+  const hasLegacyGoal=!!safeText(r.goalTitle,300) || !!safeText(r.goalWhy,1000) || !!safeDate(r.goalStartedAt);
+  return hasEntries || hasConfiguredGoal || hasLegacyGoal;
+}
 function normalizeData(raw){
-  const src=raw&&typeof raw==="object"?raw:{}; const rawRoutines=Array.isArray(src.routines)?src.routines:[]; const routinesById=new Map(rawRoutines.map(r=>[r&&r.id,r])); const builtinIds=new Set(ROUTINE_DEFS.map(x=>x.id));
-  const builtins=ROUTINE_DEFS.map(def=>normalizeRoutine(routinesById.get(def.id)||def)).filter(Boolean); const customs=rawRoutines.filter(r=>r&&r.isCustom===true&&!builtinIds.has(r.id)).map(normalizeRoutine).filter(Boolean);
-  return {...src,schemaVersion:SCHEMA_VERSION,baselineBooks:Math.max(0,Number.parseInt(src.baselineBooks)||0),weeklyGoal:Math.max(1,Number.parseInt(src.weeklyGoal)||2),ownerName:safeText(src.ownerName,200),books:Array.isArray(src.books)?src.books.slice(0,5000).map(normalizeBook):[],routines:[...builtins,...customs],updatedAt:Date.now()};
+  const src=raw&&typeof raw==="object"?raw:{};
+  const rawRoutines=Array.isArray(src.routines)?src.routines:[];
+  const legacyIds=new Set(ROUTINE_DEFS.map(x=>x.id));
+  const routines=[];
+  rawRoutines.forEach(source=>{
+    if(!source || typeof source!=="object") return;
+    const isLegacy=legacyIds.has(source.id);
+    if(isLegacy && !legacyRoutineHasUserData(source)) return; // untouched presets disappear, no data is deleted
+    if(!isLegacy && source.isCustom!==true) return;
+    const normalized=normalizeRoutine({...source,isCustom:true});
+    if(normalized){ normalized.isCustom=true; routines.push(normalized); }
+  });
+  return {...src,schemaVersion:SCHEMA_VERSION,baselineBooks:Math.max(0,Number.parseInt(src.baselineBooks)||0),weeklyGoal:Math.max(1,Number.parseInt(src.weeklyGoal)||2),ownerName:safeText(src.ownerName,200),books:Array.isArray(src.books)?src.books.slice(0,5000).map(normalizeBook):[],routines,updatedAt:Date.now()};
 }
 function plausibleData(obj){ return !!obj && typeof obj === "object" && Array.isArray(obj.books); }
 
@@ -203,6 +221,9 @@ async function loadData(){
       loaded=backup.data;
       alert("저장 데이터에 문제가 있어 가장 최근 자동 백업으로 복구했어요.");
     }
+  }
+  if(loaded && Number(loaded.schemaVersion||0) < SCHEMA_VERSION){
+    await writeBackup(JSON.parse(JSON.stringify(loaded)),"before-v5-custom-goals-migration");
   }
   data=normalizeData(loaded || data);
   await saveData({backup:false});
@@ -1631,13 +1652,23 @@ function importData(file){
 }
 
 function renderCustomGoalKindOptions(){const kind=document.getElementById("customGoalKind").value,box=document.getElementById("customGoalKindOptions");if(kind==="time")box.innerHTML=`<div class="custom-kind-options"><label>${tr("목표 시각")}</label><input id="customGoalTime" type="time" value="07:00" /></div>`;else if(kind==="number")box.innerHTML=`<div class="custom-kind-options"><div class="goal-frequency-row"><span>${tr("목표값")}</span><input id="customGoalTargetValue" type="number" step="any" value="1"></div><div class="goal-frequency-row"><span>${tr("단위")}</span><input id="customGoalUnit" placeholder="예: km, ml, 분" style="max-width:120px"></div><div class="goal-frequency-row"><span>${tr("달성 기준")}</span><select id="customGoalTargetMode" class="modal-select"><option value="min">${tr("목표값 이상")}</option><option value="max">${tr("목표값 이하")}</option></select></div></div>`;else box.innerHTML="";}
-function openCustomGoalModal(){document.getElementById("customGoalIcon").value="🎯";document.getElementById("customGoalName").value="";document.getElementById("customGoalKind").value="check";document.getElementById("customGoalWeeklyTarget").value="3";document.getElementById("customGoalReason").value="";renderCustomGoalKindOptions();document.getElementById("customGoalModal").classList.remove("hidden");}
+function openCustomGoalModal(){document.getElementById("customGoalIcon").value="🎯";document.getElementById("customGoalName").value="";document.getElementById("customGoalKind").value="check";document.getElementById("customGoalWeeklyTarget").value="3";document.getElementById("customGoalReason").value="";document.getElementById("customGoalEmojiPanel")?.classList.add("hidden");renderCustomGoalKindOptions();document.getElementById("customGoalModal").classList.remove("hidden");}
 async function saveCustomGoal(){const name=document.getElementById("customGoalName").value.trim();if(!name){alert("목표 이름을 입력해 주세요.");return;}const kind=document.getElementById("customGoalKind").value,weeklyTarget=Math.max(1,Math.min(7,parseInt(document.getElementById("customGoalWeeklyTarget").value)||3)),r={id:"custom_"+Date.now(),name,icon:document.getElementById("customGoalIcon").value.trim()||"🎯",kind,isCustom:true,entries:[],goalTime:"",targetValue:null,targetMode:"min",unit:"",goal:{configured:true,statement:name,reason:document.getElementById("customGoalReason").value.trim(),weeklyTarget,startedAt:todayStr()}};if(kind==="time")r.goalTime=document.getElementById("customGoalTime").value||"07:00";if(kind==="number"){const v=Number(document.getElementById("customGoalTargetValue").value);if(!Number.isFinite(v)){alert("숫자 목표값을 입력해 주세요.");return;}r.targetValue=v;r.unit=document.getElementById("customGoalUnit").value.trim();r.targetMode=document.getElementById("customGoalTargetMode").value;}data.routines.push(r);await saveData();document.getElementById("customGoalModal").classList.add("hidden");renderMboMain();}
+function initEmojiPicker(){
+  const btn=document.getElementById("customGoalEmojiBtn");
+  const panel=document.getElementById("customGoalEmojiPanel");
+  const picker=document.getElementById("customGoalEmojiPicker");
+  const input=document.getElementById("customGoalIcon");
+  if(!btn||!panel||!picker||!input) return;
+  btn.addEventListener("click",(e)=>{e.stopPropagation();panel.classList.toggle("hidden");});
+  picker.addEventListener("emoji-click",(e)=>{const emoji=e.detail&&e.detail.unicode;if(emoji){input.value=emoji;panel.classList.add("hidden");}});
+  document.addEventListener("click",(e)=>{if(!panel.classList.contains("hidden")&&!panel.contains(e.target)&&e.target!==btn)panel.classList.add("hidden");});
+}
 let tooltipPinned=false;function showGlobalTooltip(target,x,y,pin=false){const tip=document.getElementById("globalTooltip"),text=target&&target.dataset?target.dataset.tooltip:"";if(!tip||!text)return;tip.textContent=text;tip.classList.remove("hidden");tip.classList.toggle("pinned",!!pin);tooltipPinned=!!pin;let left=(x||0)+14,top=(y||0)+14;tip.style.left=left+"px";tip.style.top=top+"px";const rect=tip.getBoundingClientRect(),margin=12;if(rect.right>window.innerWidth-margin)left=Math.max(margin,window.innerWidth-rect.width-margin);if(rect.bottom>window.innerHeight-margin)top=Math.max(margin,(y||0)-rect.height-14);tip.style.left=left+"px";tip.style.top=top+"px";}
 function hideGlobalTooltip(){const tip=document.getElementById("globalTooltip");if(tip){tip.classList.add("hidden");tip.classList.remove("pinned");}tooltipPinned=false;}
 function initGlobalTooltips(){document.addEventListener("mouseover",e=>{const t=e.target.closest&&e.target.closest("[data-tooltip]");if(t&&!tooltipPinned)showGlobalTooltip(t,e.clientX,e.clientY,false);});document.addEventListener("mousemove",e=>{if(tooltipPinned)return;const t=e.target.closest&&e.target.closest("[data-tooltip]");if(t)showGlobalTooltip(t,e.clientX,e.clientY,false);});document.addEventListener("mouseout",e=>{if(tooltipPinned)return;const t=e.target.closest&&e.target.closest("[data-tooltip]");if(t)hideGlobalTooltip();});document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest("[data-tooltip]");if(t){const r=t.getBoundingClientRect();showGlobalTooltip(t,r.left+r.width/2,r.bottom,true);return;}if(tooltipPinned)hideGlobalTooltip();});window.addEventListener("scroll",()=>{if(tooltipPinned)hideGlobalTooltip();},{passive:true});}
 function rerenderVisibleForLanguage(){try{if(!document.getElementById("mboScreen").classList.contains("hidden"))renderMboMain();if(!document.getElementById("bridgeScreen").classList.contains("hidden")&&currentBridgeId)renderBridge(currentBridgeId);if(!document.getElementById("routineDetailScreen").classList.contains("hidden")&&currentRoutineDetailId)renderRoutineDetail(currentRoutineDetailId);if(!document.getElementById("lifeRetroScreen").classList.contains("hidden"))renderLifeRetro();if(!document.getElementById("homeScreen").classList.contains("hidden"))renderHome();if(!document.getElementById("library").classList.contains("hidden"))renderLibrary();}catch(e){console.warn("language rerender skipped",e);}}
-window.addEventListener("mbo-language-change",()=>setTimeout(rerenderVisibleForLanguage,0));document.getElementById("openCustomGoalBtn").addEventListener("click",openCustomGoalModal);document.getElementById("cancelCustomGoalBtn").addEventListener("click",()=>document.getElementById("customGoalModal").classList.add("hidden"));document.getElementById("customGoalKind").addEventListener("change",renderCustomGoalKindOptions);document.getElementById("saveCustomGoalBtn").addEventListener("click",saveCustomGoal);initGlobalTooltips();
+window.addEventListener("mbo-language-change",()=>setTimeout(rerenderVisibleForLanguage,0));document.getElementById("openCustomGoalBtn").addEventListener("click",openCustomGoalModal);document.getElementById("cancelCustomGoalBtn").addEventListener("click",()=>document.getElementById("customGoalModal").classList.add("hidden"));document.getElementById("customGoalKind").addEventListener("change",renderCustomGoalKindOptions);document.getElementById("saveCustomGoalBtn").addEventListener("click",saveCustomGoal);initGlobalTooltips();initEmojiPicker();
 
 document.getElementById("baselineInput").addEventListener("change", async (e)=>{
   data.baselineBooks = Math.max(0, parseInt(e.target.value)||0);
