@@ -786,6 +786,7 @@ function renderMboMain(){
   let html=`<div class="mbo-card" data-mbo="reading"><div class="mbo-icon">📚</div><div class="mbo-name">${tr("독서")}</div><div class="mbo-sub">${tr("총")} ${totalBooks}${tr("권")} · ${readingSuccessOn(todayKey)?tr("오늘 기록 ✓"):tr("오늘은 아직")}</div></div>`;
   (data.routines||[]).forEach(r=>{const streak=routineStreak(r),todayOk=routineSuccess(r,routineEntry(r,todayKey)),g=ensureRoutineGoalShape(r);const sub=g.configured?`${routineWeekSuccessCount(r)}/${g.weeklyTarget}${tr("회")} · ${todayOk?tr("오늘 ✓"):(streak?`${streak}${tr("일 연속")}`:tr("오늘은 아직"))}`:tr("목표를 아직 정하지 않았어요 →");html+=`<div class="mbo-card ${g.configured?"":"needs-goal"}" data-mbo="${escapeAttr(r.id)}"><div class="mbo-icon">${r.icon}</div><div class="mbo-name">${escapeHtml(tr(r.name))}</div><div class="mbo-sub">${sub}</div></div>`;});
   grid.innerHTML=html;grid.querySelectorAll("[data-mbo]").forEach(el=>el.addEventListener("click",()=>{const id=el.dataset.mbo;if(id==="reading")showHome();else showBridge(id);}));
+  if(window.I18N && window.I18N.getLanguage && window.I18N.getLanguage()!=="ko") requestAnimationFrame(()=>window.I18N.refresh && window.I18N.refresh());
 }
 
 function routineMiniHeatmapHtml(r, days){
