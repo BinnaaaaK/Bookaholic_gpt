@@ -1002,3 +1002,124 @@ emoji-picker{
   .emoji-picker-panel{ left:50%; transform:translateX(-20%); }
   emoji-picker{ width:min(330px,calc(100vw - 36px)); height:330px; }
 }
+
+
+/* ---------- Adaptive goal-card layout ----------
+   Cards expand and stay centered according to the number of active goals.
+   This prevents a short final row from sticking to the left. ---------- */
+.mbo-grid{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  align-items:stretch;
+  gap:14px;
+  width:100%;
+}
+.mbo-grid .mbo-card{
+  flex:0 1 calc(25% - 11px);
+  min-width:0;
+  min-height:126px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.mbo-grid[data-count="1"] .mbo-card{
+  flex-basis:min(100%, 460px);
+  min-height:168px;
+  padding:26px 24px;
+}
+.mbo-grid[data-count="2"] .mbo-card{
+  flex-basis:calc(50% - 7px);
+  min-height:158px;
+  padding:24px 22px;
+}
+.mbo-grid[data-count="3"] .mbo-card{
+  flex-basis:calc(33.333% - 10px);
+  min-height:150px;
+  padding:22px 19px;
+}
+.mbo-grid[data-count="4"] .mbo-card{
+  flex-basis:calc(50% - 7px);
+  min-height:144px;
+  padding:21px 20px;
+}
+.mbo-grid[data-count="5"] .mbo-card,
+.mbo-grid[data-count="6"] .mbo-card{
+  flex-basis:calc(33.333% - 10px);
+  min-height:136px;
+}
+.mbo-grid[data-count="7"] .mbo-card{
+  flex-basis:calc(25% - 11px);
+}
+.mbo-grid[data-count="1"] .mbo-icon{font-size:34px}
+.mbo-grid[data-count="2"] .mbo-icon{font-size:32px}
+.mbo-grid[data-count="3"] .mbo-icon{font-size:29px}
+.mbo-grid[data-count="1"] .mbo-name{font-size:18px}
+.mbo-grid[data-count="2"] .mbo-name{font-size:17px}
+.mbo-grid[data-count="3"] .mbo-name{font-size:16px}
+.mbo-grid[data-count="1"] .mbo-sub,
+.mbo-grid[data-count="2"] .mbo-sub{font-size:12.5px}
+
+/* The Today dashboard uses the same centering rule. */
+.today-dashboard-items{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:8px;
+}
+.today-dashboard-items .today-dashboard-item{
+  flex:0 1 calc(50% - 4px);
+  min-width:0;
+}
+.today-dashboard-items[data-count="1"] .today-dashboard-item{
+  flex-basis:min(100%, 460px);
+}
+.today-dashboard-items[data-count="2"] .today-dashboard-item{
+  flex-basis:calc(50% - 4px);
+}
+.today-dashboard-items[data-count="3"] .today-dashboard-item{
+  flex-basis:calc(33.333% - 6px);
+}
+.today-dashboard-items[data-count="4"] .today-dashboard-item{
+  flex-basis:calc(50% - 4px);
+}
+.today-dashboard-items[data-count="5"] .today-dashboard-item,
+.today-dashboard-items[data-count="6"] .today-dashboard-item{
+  flex-basis:calc(33.333% - 6px);
+}
+.today-dashboard-items[data-count="7"] .today-dashboard-item{
+  flex-basis:calc(25% - 6px);
+}
+
+@media (max-width:560px){
+  .mbo-grid{ gap:10px; }
+  .mbo-grid .mbo-card,
+  .mbo-grid[data-count="2"] .mbo-card,
+  .mbo-grid[data-count="3"] .mbo-card,
+  .mbo-grid[data-count="4"] .mbo-card,
+  .mbo-grid[data-count="5"] .mbo-card,
+  .mbo-grid[data-count="6"] .mbo-card,
+  .mbo-grid[data-count="7"] .mbo-card{
+    flex-basis:calc(50% - 5px);
+    min-height:126px;
+    padding:17px 14px;
+  }
+  .mbo-grid[data-count="1"] .mbo-card{
+    flex-basis:100%;
+    min-height:148px;
+  }
+  .mbo-grid[data-count="3"] .mbo-card:last-child,
+  .mbo-grid[data-count="5"] .mbo-card:last-child,
+  .mbo-grid[data-count="7"] .mbo-card:last-child{
+    flex-basis:min(100%, 330px);
+  }
+  .today-dashboard-items .today-dashboard-item,
+  .today-dashboard-items[data-count="2"] .today-dashboard-item,
+  .today-dashboard-items[data-count="3"] .today-dashboard-item,
+  .today-dashboard-items[data-count="4"] .today-dashboard-item,
+  .today-dashboard-items[data-count="5"] .today-dashboard-item,
+  .today-dashboard-items[data-count="6"] .today-dashboard-item,
+  .today-dashboard-items[data-count="7"] .today-dashboard-item{
+    flex-basis:100%;
+  }
+}
