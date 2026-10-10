@@ -14,6 +14,31 @@ function getUserStorageKey(userId) {
     ? `book-library-v1-${userId}`
     : "book-library-v1-guest";
 }
+async function copyLegacyDataToCurrentUser() {
+  try {
+    const {
+      data: { user },
+      error
+    } = await supabaseClient.auth.getUser();
+
+    if (error || !user) return;
+
+    const oldData = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!oldData) return;
+
+    const userKey = getUserStorageKey(user.id);
+
+    // 이미 사용자 전용 데이터가 있으면 덮어쓰지 않음
+    if (localStorage.getItem(userKey)) return;
+
+    // 기존 데이터를 복사만 함
+    localStorage.setItem(userKey, oldData);
+
+    console.log("기존 데이터를 사용자 전용 저장공간으로 안전하게 복사했습니다.");
+  } catch (err) {
+    console.error("사용자 데이터 복사 실패:", err);
+  }
+}
 const tr = (text)=> (window.I18N && window.I18N.translateText) ? window.I18N.translateText(String(text)) : String(text);
 const trHtml = (html)=> (window.I18N && window.I18N.translateHtmlString) ? window.I18N.translateHtmlString(html) : html;
 const TIMER_KEY = "book-library-active-timer-v1";
@@ -2304,8 +2329,12 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
   updateAuthUI(session);
 });
 
-supabaseClient.auth.getSession().then(({ data }) => {
+supabaseClient.auth.getSession().then(async ({ data }) => {
   updateAuthUI(data.session);
+
+  if (data.session?.user) {
+    await copyLegacyDataToCurrentUser();
+  }
 });
 
 // ---------- Supabase Cloud Backup ----------
