@@ -2335,6 +2335,7 @@ supabaseClient.auth.getSession().then(async ({ data }) => {
   updateAuthUI(data.session);
 
   if (data.session?.user) {
+    currentStorageKey = getUserStorageKey(data.session.user.id);
     await copyLegacyDataToCurrentUser();
   }
 });
