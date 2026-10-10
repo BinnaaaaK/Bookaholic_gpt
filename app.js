@@ -2346,15 +2346,31 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
   updateAuthUI(session);
 });
 
-supabaseClient.auth.getSession().then(async ({ data }) => {
-  updateAuthUI(data.session);
+supabaseClient.auth.getSession().then(async ({ data: sessionData }) => {
+  const session = sessionData.session;
 
-  if (data.session?.user) {
-    currentStorageKey = getUserStorageKey(data.session.user.id);
+  updateAuthUI(session);
+
+  if (session?.user) {
+    // 로그인한 사용자는 자기 전용 데이터만 불러옴
+    currentStorageKey = getUserStorageKey(session.user.id);
+
     await copyLegacyDataToCurrentUser();
+    await loadData();
+
+  } else {
+    // 로그아웃 상태에서는 어떤 로컬 데이터도 불러오지 않음
+    currentStorageKey = getUserStorageKey(null);
+
+    data = normalizeData({
+      schemaVersion: SCHEMA_VERSION,
+      books: [],
+      baselineBooks: 0,
+      routines: []
+    });
+
+    applyMbo();
   }
-  
-  await loadData();
 });
 
 // ---------- Supabase Cloud Backup ----------
