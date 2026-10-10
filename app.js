@@ -254,7 +254,7 @@ async function loadData(){
   if(tryRenderSharedFromHash()) return;
   let loaded=null, corrupt=false;
   try{
-    const raw=localStorage.getItem(STORAGE_KEY);
+    const raw=localStorage.getItem(currentStorageKey);
     if(raw){ loaded=JSON.parse(raw); if(!plausibleData(loaded)) corrupt=true; }
   }catch(e){ corrupt=true; }
   if(corrupt){
@@ -2338,6 +2338,8 @@ supabaseClient.auth.getSession().then(async ({ data }) => {
     currentStorageKey = getUserStorageKey(data.session.user.id);
     await copyLegacyDataToCurrentUser();
   }
+  
+  await loadData();
 });
 
 // ---------- Supabase Cloud Backup ----------
@@ -2408,5 +2410,3 @@ async function backupDataToSupabase() {
 document
   .getElementById("cloudBackupBtn")
   ?.addEventListener("click", backupDataToSupabase);
-
-loadData();
