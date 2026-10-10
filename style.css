@@ -1123,3 +1123,32 @@ emoji-picker{
     flex-basis:100%;
   }
 }
+
+/* ========================================
+   AUTH GATE
+   로그아웃 상태에서는 개인 화면 완전 차단
+======================================== */
+
+body.auth-locked #mboScreen,
+body.auth-locked #homeScreen,
+body.auth-locked #library,
+body.auth-locked #bridgeScreen,
+body.auth-locked #routineDetailScreen,
+body.auth-locked #overlay {
+  display: none !important;
+}
+
+body.auth-locked #authGate {
+  display: flex !important;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+body.auth-locked #authGate .home-wrap {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  text-align: center;
+}
