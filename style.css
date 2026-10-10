@@ -1152,3 +1152,7 @@ body.auth-locked #authGate .home-wrap {
   margin: 0 auto;
   text-align: center;
 }
+
+body.auth-locked .global-auth-box {
+  display: none !important;
+}
