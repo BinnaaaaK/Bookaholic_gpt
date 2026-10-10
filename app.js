@@ -2363,6 +2363,46 @@ document.getElementById("emailAuthCancelBtn")?.addEventListener("click", () => {
   }
 });
 
+document.getElementById("emailSignUpBtn")?.addEventListener("click", async () => {
+  const email = document.getElementById("emailAuthEmail")?.value.trim();
+  const password = document.getElementById("emailAuthPassword")?.value;
+  const message = document.getElementById("emailAuthMessage");
+
+  if (!email || !password) {
+    if (message) {
+      message.textContent = "이메일과 비밀번호를 모두 입력해 주세요.";
+    }
+    return;
+  }
+
+  if (message) {
+    message.textContent = "회원가입 처리 중...";
+  }
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email: email,
+    password: password,
+    options: {
+      emailRedirectTo: "https://binnaaaak.github.io/Bookaholic_gpt/"
+    }
+  });
+
+  if (error) {
+    console.error(error);
+
+    if (message) {
+      message.textContent = "회원가입에 실패했습니다: " + error.message;
+    }
+
+    return;
+  }
+
+  if (message) {
+    message.textContent =
+      "회원가입 요청이 완료됐습니다. 이메일로 받은 인증 링크를 확인해 주세요.";
+  }
+});
+
 supabaseClient.auth.onAuthStateChange((event, session) => {
   updateAuthUI(session);
 });
