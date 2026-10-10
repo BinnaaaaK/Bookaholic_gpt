@@ -2411,6 +2411,46 @@ document.getElementById("emailSignUpBtn")?.addEventListener("click", async () =>
   }
 });
 
+document.getElementById("emailLoginBtn")?.addEventListener("click", async () => {
+  const email = document.getElementById("emailAuthEmail")?.value.trim();
+  const password = document.getElementById("emailAuthPassword")?.value;
+  const message = document.getElementById("emailAuthMessage");
+
+  if (!email || !password) {
+    if (message) {
+      message.textContent = "이메일과 비밀번호를 모두 입력해 주세요.";
+    }
+    return;
+  }
+
+  if (message) {
+    message.textContent = "로그인 중...";
+  }
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email: email,
+    password: password
+  });
+
+  if (error) {
+    console.error(error);
+
+    if (message) {
+      message.textContent = "로그인에 실패했습니다: " + error.message;
+    }
+
+    return;
+  }
+
+  if (message) {
+    message.textContent = "로그인되었습니다.";
+  }
+
+  document.getElementById("emailAuthModal")?.classList.add("hidden");
+
+  window.location.reload();
+});
+
 supabaseClient.auth.onAuthStateChange((event, session) => {
   updateAuthUI(session);
 });
