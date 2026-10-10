@@ -2342,6 +2342,27 @@ function updateAuthUI(session) {
 document.getElementById("githubLoginBtn")?.addEventListener("click", signInWithGitHub);
 document.getElementById("logoutBtn")?.addEventListener("click", signOutFromSupabase);
 
+document.getElementById("emailAuthBtn")?.addEventListener("click", () => {
+  const modal = document.getElementById("emailAuthModal");
+  const message = document.getElementById("emailAuthMessage");
+
+  if (message) {
+    message.textContent = "";
+  }
+
+  if (modal) {
+    modal.classList.remove("hidden");
+  }
+});
+
+document.getElementById("emailAuthCancelBtn")?.addEventListener("click", () => {
+  const modal = document.getElementById("emailAuthModal");
+
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+});
+
 supabaseClient.auth.onAuthStateChange((event, session) => {
   updateAuthUI(session);
 });
