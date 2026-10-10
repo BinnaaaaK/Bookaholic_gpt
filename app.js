@@ -2366,11 +2366,19 @@ document.getElementById("emailAuthCancelBtn")?.addEventListener("click", () => {
 document.getElementById("emailSignUpBtn")?.addEventListener("click", async () => {
   const email = document.getElementById("emailAuthEmail")?.value.trim();
   const password = document.getElementById("emailAuthPassword")?.value;
+  const passwordConfirm = document.getElementById("emailAuthPasswordConfirm")?.value;
   const message = document.getElementById("emailAuthMessage");
 
   if (!email || !password) {
     if (message) {
       message.textContent = "이메일과 비밀번호를 모두 입력해 주세요.";
+    }
+    return;
+  }
+
+  if (password !== passwordConfirm) {
+    if (message) {
+      message.textContent = "비밀번호가 서로 일치하지 않습니다.";
     }
     return;
   }
