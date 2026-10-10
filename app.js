@@ -275,7 +275,7 @@ async function loadData(){
 async function saveData(opts={}){
   try{
     data=normalizeData(data);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(currentStorageKey, JSON.stringify(data));
     if(opts.backup!==false) maybeAutoBackup();
     return true;
   }catch(e){
