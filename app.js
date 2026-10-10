@@ -2461,6 +2461,8 @@ supabaseClient.auth.getSession().then(async ({ data: sessionData }) => {
   updateAuthUI(session);
 
   if (session?.user) {
+    document.body.classList.remove("auth-locked");
+    
     // 로그인 상태: 로그인 전용 화면 숨기기
     document.getElementById("authGate")?.classList.add("hidden");
 
@@ -2474,6 +2476,8 @@ supabaseClient.auth.getSession().then(async ({ data: sessionData }) => {
     await loadData();
 
   } else {
+    document.body.classList.add("auth-locked");
+    
     // 로그아웃 상태: 개인 화면 전부 숨기기
     currentStorageKey = getUserStorageKey(null);
 
