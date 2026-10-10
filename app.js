@@ -7,6 +7,13 @@ const supabaseClient = window.supabase.createClient(
 );
 
 const STORAGE_KEY = "book-library-v1";
+const LEGACY_STORAGE_KEY = STORAGE_KEY;
+
+function getUserStorageKey(userId) {
+  return userId
+    ? `book-library-v1-${userId}`
+    : "book-library-v1-guest";
+}
 const tr = (text)=> (window.I18N && window.I18N.translateText) ? window.I18N.translateText(String(text)) : String(text);
 const trHtml = (html)=> (window.I18N && window.I18N.translateHtmlString) ? window.I18N.translateHtmlString(html) : html;
 const TIMER_KEY = "book-library-active-timer-v1";
