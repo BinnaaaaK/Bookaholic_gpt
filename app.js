@@ -2342,6 +2342,12 @@ function updateAuthUI(session) {
 document.getElementById("githubLoginBtn")?.addEventListener("click", signInWithGitHub);
 document.getElementById("logoutBtn")?.addEventListener("click", signOutFromSupabase);
 
+document.getElementById("authGateGithubBtn")?.addEventListener("click", signInWithGitHub);
+
+document.getElementById("authGateEmailBtn")?.addEventListener("click", () => {
+  document.getElementById("emailAuthBtn")?.click();
+});
+
 document.getElementById("emailAuthBtn")?.addEventListener("click", () => {
   const modal = document.getElementById("emailAuthModal");
   const message = document.getElementById("emailAuthMessage");
