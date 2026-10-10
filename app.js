@@ -1,3 +1,11 @@
+const SUPABASE_URL = "https://pywwlrfxqrljriumxmwf.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_DDpOhpK3oex7Fi85jTQ0rQ_8y2bdngi";
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
+
 const STORAGE_KEY = "book-library-v1";
 const tr = (text)=> (window.I18N && window.I18N.translateText) ? window.I18N.translateText(String(text)) : String(text);
 const trHtml = (html)=> (window.I18N && window.I18N.translateHtmlString) ? window.I18N.translateHtmlString(html) : html;
