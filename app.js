@@ -2461,14 +2461,20 @@ supabaseClient.auth.getSession().then(async ({ data: sessionData }) => {
   updateAuthUI(session);
 
   if (session?.user) {
-    // 로그인한 사용자는 자기 전용 데이터만 불러옴
+    // 로그인 상태: 로그인 전용 화면 숨기기
+    document.getElementById("authGate")?.classList.add("hidden");
+
+    // 이 사용자 전용 저장공간 선택
     currentStorageKey = getUserStorageKey(session.user.id);
 
+    // 기존 사용자 데이터가 있다면 안전하게 복사
     await copyLegacyDataToCurrentUser();
+
+    // 로그인한 사용자의 데이터 불러오기
     await loadData();
 
   } else {
-    // 로그아웃 상태에서는 어떤 로컬 데이터도 불러오지 않음
+    // 로그아웃 상태: 개인 화면 전부 숨기기
     currentStorageKey = getUserStorageKey(null);
 
     data = normalizeData({
@@ -2478,7 +2484,11 @@ supabaseClient.auth.getSession().then(async ({ data: sessionData }) => {
       routines: []
     });
 
-    applyMbo();
+    // MBO, 서재 등 기존 화면 숨기기
+    hideAllScreens();
+
+    // 로그인 / 회원가입 시작 화면만 표시
+    document.getElementById("authGate")?.classList.remove("hidden");
   }
 });
 
