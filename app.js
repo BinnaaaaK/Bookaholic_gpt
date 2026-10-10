@@ -2293,7 +2293,26 @@ async function signOutFromSupabase() {
   if (error) {
     alert("로그아웃 중 오류가 발생했습니다.");
     console.error(error);
+    return;
   }
+
+  // 로그아웃하면 게스트 저장공간으로 전환
+  currentStorageKey = getUserStorageKey(null);
+
+  // 화면에 남아 있던 로그인 사용자 데이터를 비움
+  data = normalizeData({
+    schemaVersion: SCHEMA_VERSION,
+    books: [],
+    baselineBooks: 0,
+    routines: []
+  });
+
+  // 게스트 데이터가 있으면 불러오고,
+  // 없으면 빈 화면으로 시작
+  await loadData();
+
+  // 로그인 UI를 로그아웃 상태로 변경
+  updateAuthUI(null);
 }
 
 function updateAuthUI(session) {
