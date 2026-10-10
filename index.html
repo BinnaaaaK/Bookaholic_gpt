@@ -17,6 +17,7 @@
 
 <div class="global-auth-box">
   <button id="githubLoginBtn" type="button">GitHub로 로그인</button>
+  <button id="emailAuthBtn" type="button">이메일로 로그인</button>
   <button id="cloudBackupBtn" type="button" class="hidden">☁️ 클라우드 백업</button>
   <button id="logoutBtn" type="button" class="hidden">로그아웃</button>
   <span id="authStatus" class="sans"></span>
@@ -482,6 +483,55 @@
   </div>
 </div>
 
+<div id="emailAuthModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h3>이메일로 로그인</h3>
+
+    <label for="emailAuthEmail">이메일</label>
+    <input
+      id="emailAuthEmail"
+      type="email"
+      placeholder="example@email.com"
+      autocomplete="email"
+    />
+
+    <label for="emailAuthPassword">비밀번호</label>
+    <input
+      id="emailAuthPassword"
+      type="password"
+      placeholder="비밀번호"
+      autocomplete="current-password"
+    />
+
+    <p id="emailAuthMessage" class="save-hint"></p>
+
+    <div class="modal-actions">
+      <button
+        id="emailAuthCancelBtn"
+        type="button"
+        class="secondary"
+      >
+        취소
+      </button>
+
+      <button
+        id="emailSignUpBtn"
+        type="button"
+        class="secondary"
+      >
+        회원가입
+      </button>
+
+      <button
+        id="emailLoginBtn"
+        type="button"
+      >
+        로그인
+      </button>
+    </div>
+  </div>
+</div>
+  
 <div id="globalTooltip" class="global-tooltip hidden" role="tooltip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
