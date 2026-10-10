@@ -2238,4 +2238,64 @@ function updateTimerDisplay(){
   if(el) el.textContent = `${h}:${m}:${s}`;
 }
 
+// ---------- Supabase GitHub Login ----------
+async function signInWithGitHub() {
+  const { error } = await supabaseClient.auth.signInWithOAuth({
+    provider: "github",
+    options: {
+      redirectTo: "https://binnaaaak.github.io/Bookaholic_gpt/"
+    }
+  });
+
+  if (error) {
+    alert("GitHub 로그인 중 오류가 발생했습니다.");
+    console.error(error);
+  }
+}
+
+async function signOutFromSupabase() {
+  const { error } = await supabaseClient.auth.signOut();
+
+  if (error) {
+    alert("로그아웃 중 오류가 발생했습니다.");
+    console.error(error);
+  }
+}
+
+function updateAuthUI(session) {
+  const loginBtn = document.getElementById("githubLoginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const authStatus = document.getElementById("authStatus");
+
+  if (!loginBtn || !logoutBtn || !authStatus) return;
+
+  if (session && session.user) {
+    loginBtn.classList.add("hidden");
+    logoutBtn.classList.remove("hidden");
+
+    const username =
+      session.user.user_metadata?.user_name ||
+      session.user.user_metadata?.preferred_username ||
+      session.user.email ||
+      "로그인됨";
+
+    authStatus.textContent = username;
+  } else {
+    loginBtn.classList.remove("hidden");
+    logoutBtn.classList.add("hidden");
+    authStatus.textContent = "";
+  }
+}
+
+document.getElementById("githubLoginBtn")?.addEventListener("click", signInWithGitHub);
+document.getElementById("logoutBtn")?.addEventListener("click", signOutFromSupabase);
+
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  updateAuthUI(session);
+});
+
+supabaseClient.auth.getSession().then(({ data }) => {
+  updateAuthUI(data.session);
+});
+
 loadData();
