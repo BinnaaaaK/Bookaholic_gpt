@@ -2266,12 +2266,14 @@ function updateAuthUI(session) {
   const loginBtn = document.getElementById("githubLoginBtn");
   const logoutBtn = document.getElementById("logoutBtn");
   const authStatus = document.getElementById("authStatus");
+  const cloudBackupBtn = document.getElementById("cloudBackupBtn");
 
-  if (!loginBtn || !logoutBtn || !authStatus) return;
+  if (!loginBtn || !logoutBtn || !cloudBackupBtn || !authStatus) return;
 
   if (session && session.user) {
     loginBtn.classList.add("hidden");
     logoutBtn.classList.remove("hidden");
+    cloudBackupBtn.classList.remove("hidden");
 
     const username =
       session.user.user_metadata?.user_name ||
@@ -2283,6 +2285,7 @@ function updateAuthUI(session) {
   } else {
     loginBtn.classList.remove("hidden");
     logoutBtn.classList.add("hidden");
+    cloudBackupBtn.classList.add("hidden");
     authStatus.textContent = "";
   }
 }
@@ -2297,5 +2300,74 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
 supabaseClient.auth.getSession().then(({ data }) => {
   updateAuthUI(data.session);
 });
+
+// ---------- Supabase Cloud Backup ----------
+async function backupDataToSupabase() {
+  try {
+    const {
+      data: { user },
+      error: userError
+    } = await supabaseClient.auth.getUser();
+
+    if (userError || !user) {
+      alert("먼저 GitHub로 로그인해 주세요.");
+      return;
+    }
+
+    // 기존 클라우드 데이터가 있는지 확인
+    const { data: existing, error: readError } = await supabaseClient
+      .from("user_data")
+      .select("user_id, updated_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (readError) {
+      console.error(readError);
+      alert("클라우드 데이터를 확인하지 못했습니다.");
+      return;
+    }
+
+    // 이미 백업이 있다면 실수로 덮어쓰지 않도록 확인
+    if (existing) {
+      const lastBackup = existing.updated_at
+        ? new Date(existing.updated_at).toLocaleString()
+        : "알 수 없음";
+
+      const ok = confirm(
+        `이미 클라우드 백업이 있습니다.\n\n마지막 백업: ${lastBackup}\n\n현재 브라우저 데이터로 덮어쓸까요?`
+      );
+
+      if (!ok) return;
+    }
+
+    const { error: saveError } = await supabaseClient
+      .from("user_data")
+      .upsert(
+        {
+          user_id: user.id,
+          data: data,
+          updated_at: new Date().toISOString()
+        },
+        {
+          onConflict: "user_id"
+        }
+      );
+
+    if (saveError) {
+      console.error(saveError);
+      alert("클라우드 백업에 실패했습니다.");
+      return;
+    }
+
+    alert("클라우드 백업이 완료됐습니다.");
+  } catch (err) {
+    console.error(err);
+    alert("백업 중 오류가 발생했습니다.");
+  }
+}
+
+document
+  .getElementById("cloudBackupBtn")
+  ?.addEventListener("click", backupDataToSupabase);
 
 loadData();
