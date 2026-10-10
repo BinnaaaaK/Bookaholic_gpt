@@ -2296,10 +2296,10 @@ async function signOutFromSupabase() {
     return;
   }
 
-  // 로그아웃하면 게스트 저장공간으로 전환
+  // 로그인 사용자의 저장공간에서 즉시 분리
   currentStorageKey = getUserStorageKey(null);
 
-  // 화면에 남아 있던 로그인 사용자 데이터를 비움
+  // 화면에 남아 있는 개인 데이터를 즉시 비움
   data = normalizeData({
     schemaVersion: SCHEMA_VERSION,
     books: [],
@@ -2307,12 +2307,11 @@ async function signOutFromSupabase() {
     routines: []
   });
 
-  // 게스트 데이터가 있으면 불러오고,
-  // 없으면 빈 화면으로 시작
-  await loadData();
-
   // 로그인 UI를 로그아웃 상태로 변경
   updateAuthUI(null);
+
+  // 새로고침 없이 즉시 빈 MBO 화면으로 다시 그림
+  applyMbo();
 }
 
 function updateAuthUI(session) {
