@@ -14,6 +14,8 @@ function getUserStorageKey(userId) {
     ? `book-library-v1-${userId}`
     : "book-library-v1-guest";
 }
+let currentStorageKey = getUserStorageKey(null);
+
 async function copyLegacyDataToCurrentUser() {
   try {
     const {
