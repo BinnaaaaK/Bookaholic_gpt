@@ -276,6 +276,7 @@ async function saveData(opts={}){
   try{
     data=normalizeData(data);
     localStorage.setItem(currentStorageKey, JSON.stringify(data));
+    if(opts.cloud !== false) await syncDataToSupabase();
     if(opts.backup!==false) maybeAutoBackup();
     return true;
   }catch(e){
