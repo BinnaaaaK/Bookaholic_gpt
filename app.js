@@ -2543,6 +2543,37 @@ async function loadDataFromSupabase() {
   }
 }
 
+async function restoreCloudDataToCurrentUser() {
+  const cloud = await loadDataFromSupabase();
+
+  if (!cloud || !cloud.data) {
+    console.log("복원할 클라우드 데이터가 없습니다.");
+    return false;
+  }
+
+  try {
+    const restoredData = normalizeData(cloud.data);
+
+    localStorage.setItem(
+      currentStorageKey,
+      JSON.stringify(restoredData)
+    );
+
+    data = restoredData;
+
+    console.log(
+      "클라우드 데이터를 현재 사용자 저장공간에 복원했습니다.",
+      cloud.updatedAt
+    );
+
+    return true;
+
+  } catch (error) {
+    console.error("클라우드 데이터 복원 실패:", error);
+    return false;
+  }
+}
+
 // ---------- Supabase Cloud Backup ----------
 async function backupDataToSupabase() {
   try {
