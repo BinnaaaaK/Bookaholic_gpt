@@ -2475,8 +2475,31 @@ supabaseClient.auth.getSession().then(async ({ data: sessionData }) => {
     // 이 사용자 전용 저장공간 선택
     currentStorageKey = getUserStorageKey(session.user.id);
 
-    // 로그인한 사용자의 데이터 불러오기
+// 이 기기에 현재 사용자의 로컬 데이터가 있는지 확인
+const hasLocalData = !!localStorage.getItem(currentStorageKey);
+
+if (hasLocalData) {
+  // 데스크톱처럼 이미 로컬 데이터가 있으면 그대로 사용
+  await loadData();
+
+} else {
+  // 휴대폰/새 PC처럼 로컬 데이터가 없으면 Supabase에서 복원
+  const restored = await restoreCloudDataToCurrentUser();
+
+  if (restored) {
     await loadData();
+  } else {
+    // Supabase에도 데이터가 없는 완전 신규 회원은 빈 MBO로 시작
+    data = normalizeData({
+      schemaVersion: SCHEMA_VERSION,
+      books: [],
+      baselineBooks: 0,
+      routines: []
+    });
+
+    await loadData();
+  }
+}
 
   } else {
     document.body.classList.add("auth-locked");
