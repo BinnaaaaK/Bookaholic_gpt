@@ -2475,9 +2475,6 @@ supabaseClient.auth.getSession().then(async ({ data: sessionData }) => {
     // 이 사용자 전용 저장공간 선택
     currentStorageKey = getUserStorageKey(session.user.id);
 
-    // 기존 사용자 데이터가 있다면 안전하게 복사
-    await copyLegacyDataToCurrentUser();
-
     // 로그인한 사용자의 데이터 불러오기
     await loadData();
 
