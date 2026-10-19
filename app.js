@@ -2594,6 +2594,46 @@ async function restoreCloudDataToCurrentUser() {
   }
 }
 
+// ---------- Supabase Auto Sync ----------
+async function syncDataToSupabase() {
+  try {
+    const {
+      data: { user },
+      error: userError
+    } = await supabaseClient.auth.getUser();
+
+    // 로그인하지 않은 상태에서는 클라우드 저장 안 함
+    if (userError || !user) {
+      return false;
+    }
+
+    const { error: saveError } = await supabaseClient
+      .from("user_data")
+      .upsert(
+        {
+          user_id: user.id,
+          data: data,
+          updated_at: new Date().toISOString()
+        },
+        {
+          onConflict: "user_id"
+        }
+      );
+
+    if (saveError) {
+      console.error("자동 클라우드 저장 실패:", saveError);
+      return false;
+    }
+
+    console.log("Supabase 자동 저장 완료");
+    return true;
+
+  } catch (error) {
+    console.error("자동 클라우드 저장 중 오류:", error);
+    return false;
+  }
+}
+
 // ---------- Supabase Cloud Backup ----------
 async function backupDataToSupabase() {
   try {
