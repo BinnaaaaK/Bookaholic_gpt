@@ -268,7 +268,7 @@ async function loadData(){
     await writeBackup(JSON.parse(JSON.stringify(loaded)),"before-v5-custom-goals-migration");
   }
   data=normalizeData(loaded || data);
-  await saveData({backup:false});
+  await saveData({backup:false, cloud:false});
   await maybeAutoBackup();
   showMbo();
 }
