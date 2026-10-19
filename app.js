@@ -2502,6 +2502,47 @@ supabaseClient.auth.getSession().then(async ({ data: sessionData }) => {
   }
 });
 
+
+// ---------- Supabase Cloud Load ----------
+async function loadDataFromSupabase() {
+  try {
+    const {
+      data: { user },
+      error: userError
+    } = await supabaseClient.auth.getUser();
+
+    if (userError || !user) {
+      console.log("로그인된 사용자가 없습니다.");
+      return null;
+    }
+
+    const { data: row, error: loadError } = await supabaseClient
+      .from("user_data")
+      .select("data, updated_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (loadError) {
+      console.error("클라우드 데이터 불러오기 실패:", loadError);
+      return null;
+    }
+
+    if (!row || !row.data) {
+      console.log("이 사용자에게 저장된 클라우드 데이터가 없습니다.");
+      return null;
+    }
+
+    return {
+      data: row.data,
+      updatedAt: row.updated_at
+    };
+
+  } catch (err) {
+    console.error("클라우드 데이터 불러오기 중 오류:", err);
+    return null;
+  }
+}
+
 // ---------- Supabase Cloud Backup ----------
 async function backupDataToSupabase() {
   try {
