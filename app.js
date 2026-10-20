@@ -16,6 +16,22 @@ function getUserStorageKey(userId) {
 }
 let currentStorageKey = getUserStorageKey(null);
 
+function showToast(message, type = "success", duration = 3500) {
+  const toast = document.getElementById("globalToast");
+
+  if (!toast) return;
+
+  toast.textContent = message;
+  toast.classList.remove("hidden", "success", "error");
+  toast.classList.add(type);
+
+  clearTimeout(showToast.timer);
+
+  showToast.timer = setTimeout(() => {
+    toast.classList.add("hidden");
+  }, duration);
+}
+
 async function copyLegacyDataToCurrentUser() {
   try {
     const {
