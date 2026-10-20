@@ -1156,3 +1156,58 @@ body.auth-locked #authGate .home-wrap {
 body.auth-locked .global-auth-box {
   display: none !important;
 }
+
+/* ========================================
+   GLOBAL TOAST
+======================================== */
+
+.global-toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+
+  max-width: calc(100vw - 32px);
+  min-width: 280px;
+
+  padding: 13px 18px;
+  border-radius: 10px;
+
+  background: var(--card);
+  color: var(--ink);
+
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+
+  opacity: 1;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.global-toast.hidden {
+  display: none;
+}
+
+.global-toast.success {
+  border-color: var(--cloth);
+}
+
+.global-toast.error {
+  border-color: var(--danger);
+}
+
+@media (max-width: 560px) {
+  .global-toast {
+    top: 16px;
+    min-width: 0;
+    width: calc(100vw - 32px);
+  }
+}
+
+
