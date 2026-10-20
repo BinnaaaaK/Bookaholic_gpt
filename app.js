@@ -2443,9 +2443,13 @@ document.getElementById("forgotPasswordBtn")?.addEventListener("click", async ()
   return;
 }
 
-  showToast(
-    "비밀번호 재설정 메일을 보냈습니다. 이메일을 확인해 주세요.",
-    "success"
+if (message) {
+  message.textContent = "";
+}
+  
+showToast(
+  "비밀번호 재설정 메일을 보냈습니다. 이메일을 확인해 주세요.",
+  "success"
 );
 });
 
