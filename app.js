@@ -2373,6 +2373,56 @@ document.getElementById("emailAuthCancelBtn")?.addEventListener("click", () => {
   }
 });
 
+document.getElementById("forgotPasswordBtn")?.addEventListener("click", async () => {
+  const email =
+    document.getElementById("emailAuthEmail")?.value.trim();
+
+  const message =
+    document.getElementById("emailAuthMessage");
+
+  if (!email) {
+    if (message) {
+      message.textContent =
+        "비밀번호를 재설정할 이메일을 먼저 입력해 주세요.";
+    }
+    return;
+  }
+
+  if (message) {
+    message.textContent =
+      "비밀번호 재설정 메일을 보내는 중...";
+  }
+
+  const { error } =
+    await supabaseClient.auth.resetPasswordForEmail(
+      email,
+      {
+        redirectTo:
+          "https://binnaaaak.github.io/Bookaholic_gpt/"
+      }
+    );
+
+  if (error) {
+    console.error(
+      "비밀번호 재설정 메일 전송 실패:",
+      error
+    );
+
+    if (message) {
+      message.textContent =
+        "재설정 메일 전송에 실패했습니다: " +
+        error.message;
+    }
+
+    return;
+  }
+
+  if (message) {
+    message.textContent =
+      "비밀번호 재설정 메일을 보냈습니다. 이메일을 확인해 주세요.";
+  }
+});
+
 document.getElementById("setPasswordBtn")?.addEventListener("click", () => {
   const modal = document.getElementById("setPasswordModal");
   const message = document.getElementById("setPasswordMessage");
