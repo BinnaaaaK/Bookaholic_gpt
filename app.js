@@ -2593,6 +2593,20 @@ document.getElementById("emailLoginBtn")?.addEventListener("click", async () => 
 
 supabaseClient.auth.onAuthStateChange((event, session) => {
   updateAuthUI(session);
+
+  // 비밀번호 재설정 이메일의 링크를 통해 들어온 경우
+  if (event === "PASSWORD_RECOVERY") {
+    const modal = document.getElementById("setPasswordModal");
+    const message = document.getElementById("setPasswordMessage");
+
+    if (message) {
+      message.textContent = "새로운 비밀번호를 설정해 주세요.";
+    }
+
+    if (modal) {
+      modal.classList.remove("hidden");
+    }
+  }
 });
 
 supabaseClient.auth.getSession().then(async ({ data: sessionData }) => {
