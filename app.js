@@ -2317,13 +2317,15 @@ function updateAuthUI(session) {
   const logoutBtn = document.getElementById("logoutBtn");
   const authStatus = document.getElementById("authStatus");
   const cloudBackupBtn = document.getElementById("cloudBackupBtn");
+  const setPasswordBtn = document.getElementById("setPasswordBtn");
 
-  if (!loginBtn || !logoutBtn || !cloudBackupBtn || !authStatus) return;
+  if (!loginBtn || !logoutBtn || !cloudBackupBtn || !setPasswordBtn || !authStatus) return;
 
   if (session && session.user) {
     loginBtn.classList.add("hidden");
     logoutBtn.classList.remove("hidden");
     cloudBackupBtn.classList.remove("hidden");
+    setPasswordBtn.classList.remove("hidden");
 
     const username =
       session.user.user_metadata?.user_name ||
@@ -2336,6 +2338,7 @@ function updateAuthUI(session) {
     loginBtn.classList.remove("hidden");
     logoutBtn.classList.add("hidden");
     cloudBackupBtn.classList.add("hidden");
+    setPasswordBtn.classList.add("hidden");
     authStatus.textContent = "";
   }
 }
