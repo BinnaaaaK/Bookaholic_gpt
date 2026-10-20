@@ -2373,6 +2373,27 @@ document.getElementById("emailAuthCancelBtn")?.addEventListener("click", () => {
   }
 });
 
+document.getElementById("setPasswordBtn")?.addEventListener("click", () => {
+  const modal = document.getElementById("setPasswordModal");
+  const message = document.getElementById("setPasswordMessage");
+
+  if (message) {
+    message.textContent = "";
+  }
+
+  if (modal) {
+    modal.classList.remove("hidden");
+  }
+});
+
+document.getElementById("setPasswordCancelBtn")?.addEventListener("click", () => {
+  const modal = document.getElementById("setPasswordModal");
+
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+});
+
 document.getElementById("emailSignUpBtn")?.addEventListener("click", async () => {
   const email = document.getElementById("emailAuthEmail")?.value.trim();
   const password = document.getElementById("emailAuthPassword")?.value;
