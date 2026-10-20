@@ -2419,19 +2419,29 @@ document.getElementById("forgotPasswordBtn")?.addEventListener("click", async ()
     );
 
   if (error) {
-    console.error(
-      "비밀번호 재설정 메일 전송 실패:",
-      error
-    );
+  console.error(
+    "비밀번호 재설정 메일 전송 실패:",
+    error
+  );
 
-    if (message) {
-      message.textContent =
-        "재설정 메일 전송에 실패했습니다: " +
-        error.message;
-    }
-
-    return;
+  if (message) {
+    message.textContent = "";
   }
+
+  if (error.message?.includes("rate limit")) {
+    showToast(
+      "재설정 메일을 너무 자주 요청했어요. 잠시 후 다시 시도해 주세요.",
+      "error"
+    );
+  } else {
+    showToast(
+      "비밀번호 재설정 메일 전송에 실패했습니다.",
+      "error"
+    );
+  }
+
+  return;
+}
 
   showToast(
     "비밀번호 재설정 메일을 보냈습니다. 이메일을 확인해 주세요.",
