@@ -2476,21 +2476,21 @@ supabaseClient.auth.getSession().then(async ({ data: sessionData }) => {
     // 이 사용자 전용 저장공간 선택
     currentStorageKey = getUserStorageKey(session.user.id);
 
-// 이 기기에 현재 사용자의 로컬 데이터가 있는지 확인
-const hasLocalData = !!localStorage.getItem(currentStorageKey);
+// 로그인하면 Supabase의 최신 데이터를 우선 확인
+const restored = await restoreCloudDataToCurrentUser();
 
-if (hasLocalData) {
-  // 데스크톱처럼 이미 로컬 데이터가 있으면 그대로 사용
+if (restored) {
+  // 클라우드 데이터가 있으면 그것을 최신 데이터로 사용
   await loadData();
-
 } else {
-  // 휴대폰/새 PC처럼 로컬 데이터가 없으면 Supabase에서 복원
-  const restored = await restoreCloudDataToCurrentUser();
+  // 클라우드 데이터가 없는 신규 사용자는
+  // 현재 사용자 전용 로컬 데이터가 있으면 사용
+  const hasLocalData = !!localStorage.getItem(currentStorageKey);
 
-  if (restored) {
+  if (hasLocalData) {
     await loadData();
   } else {
-    // Supabase에도 데이터가 없는 완전 신규 회원은 빈 MBO로 시작
+    // 정말 처음 가입한 사용자는 빈 MBO로 시작
     data = normalizeData({
       schemaVersion: SCHEMA_VERSION,
       books: [],
@@ -2498,7 +2498,12 @@ if (hasLocalData) {
       routines: []
     });
 
-    await loadData();
+    await saveData({
+      backup: false,
+      cloud: false
+    });
+
+    applyMbo();
   }
 }
 
