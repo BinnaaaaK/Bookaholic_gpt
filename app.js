@@ -2394,6 +2394,65 @@ document.getElementById("setPasswordCancelBtn")?.addEventListener("click", () =>
   }
 });
 
+document.getElementById("setPasswordSaveBtn")?.addEventListener("click", async () => {
+  const password =
+    document.getElementById("newAccountPassword")?.value;
+
+  const passwordConfirm =
+    document.getElementById("newAccountPasswordConfirm")?.value;
+
+  const message =
+    document.getElementById("setPasswordMessage");
+
+  if (!password || !passwordConfirm) {
+    if (message) {
+      message.textContent = "새 비밀번호를 두 번 입력해 주세요.";
+    }
+    return;
+  }
+
+  if (password !== passwordConfirm) {
+    if (message) {
+      message.textContent = "비밀번호가 서로 일치하지 않습니다.";
+    }
+    return;
+  }
+
+  if (password.length < 8) {
+    if (message) {
+      message.textContent = "비밀번호는 최소 8자 이상이어야 합니다.";
+    }
+    return;
+  }
+
+  if (message) {
+    message.textContent = "비밀번호 설정 중...";
+  }
+
+  const { data, error } = await supabaseClient.auth.updateUser({
+    password: password
+  });
+
+  if (error) {
+    console.error("비밀번호 설정 실패:", error);
+
+    if (message) {
+      message.textContent =
+        "비밀번호 설정에 실패했습니다: " + error.message;
+    }
+
+    return;
+  }
+
+  if (message) {
+    message.textContent =
+      "비밀번호가 설정되었습니다. 이제 이메일과 비밀번호로도 로그인할 수 있습니다.";
+  }
+
+  document.getElementById("newAccountPassword").value = "";
+  document.getElementById("newAccountPasswordConfirm").value = "";
+});
+
 document.getElementById("emailSignUpBtn")?.addEventListener("click", async () => {
   const email = document.getElementById("emailAuthEmail")?.value.trim();
   const password = document.getElementById("emailAuthPassword")?.value;
