@@ -2371,6 +2371,22 @@ document.getElementById("authGateEmailBtn")?.addEventListener("click", () => {
 document.getElementById("emailAuthBtn")?.addEventListener("click", () => {
   const modal = document.getElementById("emailAuthModal");
   const message = document.getElementById("emailAuthMessage");
+  const confirmGroup = document.getElementById("emailPasswordConfirmGroup");
+  const signUpBtn = document.getElementById("emailSignUpBtn");
+  const passwordConfirm = document.getElementById("emailAuthPasswordConfirm");
+
+  // 로그인 창을 열 때 항상 기본 로그인 상태로 초기화
+  if (confirmGroup) {
+    confirmGroup.classList.add("hidden");
+  }
+
+  if (signUpBtn) {
+    signUpBtn.textContent = "회원가입";
+  }
+
+  if (passwordConfirm) {
+    passwordConfirm.value = "";
+  }
 
   if (message) {
     message.textContent = "";
