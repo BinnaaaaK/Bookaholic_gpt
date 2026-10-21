@@ -725,19 +725,60 @@ Object.entries(AUTH_I18N).forEach(([lang, dict]) => {
       document.title = currentLang === "ko" ? "나의 생활 MBO · 나의 서재" : (exactTranslate("나의 생활 MBO",currentLang) + " · " + exactTranslate("나의 서재",currentLang));
     } finally { translating = false; }
   }
-  function setLanguage(code){
-    if(!LANGUAGES.some(x=>x.code===code)) code="ko";
-    currentLang=code; localStorage.setItem(LANGUAGE_KEY,code);
-    const info=LANGUAGES.find(x=>x.code===code) || LANGUAGES[0];
-    document.documentElement.lang=code; document.documentElement.dir=info.dir;
-    const sel=document.getElementById("globalLanguageSelect"); if(sel && sel.value!==code) sel.value=code;
-    translateDom(document,true);
-    window.dispatchEvent(new CustomEvent("mbo-language-change",{detail:{language:code}}));
-    // app.js re-renders some panels after the language-change event.
-    // Re-scan after that render so no newly generated Korean UI remains.
-    requestAnimationFrame(()=>translateDom(document,false));
-    setTimeout(()=>translateDom(document,false),30);
+    function setLanguage(code){
+  if(!LANGUAGES.some(x=>x.code===code)) {
+    code = "ko";
   }
+
+  currentLang = code;
+  localStorage.setItem(LANGUAGE_KEY, code);
+
+  const info =
+    LANGUAGES.find(x => x.code === code) ||
+    LANGUAGES[0];
+
+  document.documentElement.lang = code;
+  document.documentElement.dir = info.dir;
+
+  const sel =
+    document.getElementById("globalLanguageSelect");
+
+  if(sel && sel.value !== code) {
+    sel.value = code;
+  }
+
+  // 1차 번역
+  translateDom(document, true);
+
+  // app.js에 언어가 변경됐음을 알림
+  // → 그래프, 카드, MBO 화면 등이 다시 렌더링됨
+  window.dispatchEvent(
+    new CustomEvent(
+      "mbo-language-change",
+      {
+        detail: {
+          language: code
+        }
+      }
+    )
+  );
+
+  // 동적 렌더링 직후 다시 번역
+  requestAnimationFrame(() => {
+    translateDom(document, false);
+  });
+
+  // 조금 늦게 생성되는 그래프/문구까지 한 번 더 확인
+  setTimeout(() => {
+    translateDom(document, false);
+  }, 50);
+
+  // 모바일이나 느린 기기에서 늦게 생성되는 요소까지 최종 확인
+  setTimeout(() => {
+    translateDom(document, false);
+  }, 250);
+}
+
   function initSelector(){
     const sel=document.getElementById("globalLanguageSelect"); if(!sel) return;
     sel.innerHTML=LANGUAGES.map(x=>`<option value="${x.code}">${x.label}</option>`).join("");
