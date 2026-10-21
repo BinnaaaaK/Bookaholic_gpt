@@ -2383,7 +2383,32 @@ document.getElementById("emailAuthBtn")?.addEventListener("click", () => {
 
 document.getElementById("emailAuthCancelBtn")?.addEventListener("click", () => {
   const modal = document.getElementById("emailAuthModal");
+  const confirmGroup = document.getElementById("emailPasswordConfirmGroup");
+  const signUpBtn = document.getElementById("emailSignUpBtn");
+  const passwordConfirm = document.getElementById("emailAuthPasswordConfirm");
+  const message = document.getElementById("emailAuthMessage");
 
+  // 비밀번호 확인칸 다시 숨기기
+  if (confirmGroup) {
+    confirmGroup.classList.add("hidden");
+  }
+
+  // 버튼 이름 원래대로
+  if (signUpBtn) {
+    signUpBtn.textContent = "회원가입";
+  }
+
+  // 비밀번호 확인값 지우기
+  if (passwordConfirm) {
+    passwordConfirm.value = "";
+  }
+
+  // 안내문 지우기
+  if (message) {
+    message.textContent = "";
+  }
+
+  // 로그인 창 닫기
   if (modal) {
     modal.classList.add("hidden");
   }
