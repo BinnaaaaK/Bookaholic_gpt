@@ -2534,21 +2534,44 @@ document.getElementById("setPasswordSaveBtn")?.addEventListener("click", async (
 });
 
 document.getElementById("emailSignUpBtn")?.addEventListener("click", async () => {
-  const email = document.getElementById("emailAuthEmail")?.value.trim();
-  const password = document.getElementById("emailAuthPassword")?.value;
-  const passwordConfirm = document.getElementById("emailAuthPasswordConfirm")?.value;
+  const confirmGroup = document.getElementById("emailPasswordConfirmGroup");
+  const signUpBtn = document.getElementById("emailSignUpBtn");
   const message = document.getElementById("emailAuthMessage");
 
-  if (!email || !password) {
+  // 첫 번째 클릭: 회원가입 입력 화면으로 전환
+  if (confirmGroup?.classList.contains("hidden")) {
+    confirmGroup.classList.remove("hidden");
+
+    if (signUpBtn) {
+      signUpBtn.textContent = "회원가입 완료";
+    }
+
     if (message) {
-      message.textContent = "이메일과 비밀번호를 모두 입력해 주세요.";
+      message.textContent =
+        "비밀번호를 한 번 더 입력한 뒤 회원가입 완료를 눌러 주세요.";
+    }
+
+    return;
+  }
+
+  // 두 번째 클릭: 실제 회원가입 진행
+  const email = document.getElementById("emailAuthEmail")?.value.trim();
+  const password = document.getElementById("emailAuthPassword")?.value;
+  const passwordConfirm =
+    document.getElementById("emailAuthPasswordConfirm")?.value;
+
+  if (!email || !password || !passwordConfirm) {
+    if (message) {
+      message.textContent =
+        "이메일과 비밀번호를 모두 입력해 주세요.";
     }
     return;
   }
 
   if (password !== passwordConfirm) {
     if (message) {
-      message.textContent = "비밀번호가 서로 일치하지 않습니다.";
+      message.textContent =
+        "비밀번호가 서로 일치하지 않습니다.";
     }
     return;
   }
