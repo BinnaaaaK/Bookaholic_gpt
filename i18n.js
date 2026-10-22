@@ -812,41 +812,28 @@ Object.entries(AUTH_I18N).forEach(([lang, dict]) => {
     translateDom(tpl.content,true);
     return tpl.innerHTML;
   }
-  function auditUntranslatedKoreanUI() {
+function auditUntranslatedKoreanUI() {
   if (currentLang === "ko") return [];
 
   const koreanRegex = /[가-힣]/;
   const results = [];
+  const seen = new Set();
 
-  const selectors = [
-    "button",
-    "label",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "option",
-    ".save-hint",
-    ".home-sub",
-    "[role='status']",
-    "[title]",
-    "[placeholder]",
-    "[aria-label]"
-  ];
+  const languageSelect =
+    document.getElementById("globalLanguageSelect");
 
-  document.querySelectorAll(selectors.join(",")).forEach(el => {
+  function shouldIgnoreElement(el) {
+    if (!el) return true;
+
     if (
       el.closest(
         "script, style, textarea, [contenteditable='true'], [data-i18n-ignore='true']"
       )
     ) {
-      return;
+      return true;
     }
-    
-    // 언어 선택기는 각 언어명을 원어로 표시하므로 검사에서 제외
-    const languageSelect =
-      document.getElementById("globalLanguageSelect");
 
+    // 언어 선택기는 각 언어명을 원어로 표시하므로 검사에서 제외
     if (
       languageSelect &&
       (
@@ -855,35 +842,89 @@ Object.entries(AUTH_I18N).forEach(([lang, dict]) => {
         el.contains(languageSelect)
       )
     ) {
-      return;
+      return true;
     }
 
-    const text = (el.textContent || "").trim();
+    return false;
+  }
 
-    if (text && koreanRegex.test(text)) {
-      results.push({
-        type: "text",
-        tag: el.tagName,
-        id: el.id || "",
-        className: el.className || "",
-        text: text
-      });
+  // 1. 화면의 모든 텍스트 노드 검사
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT
+  );
+
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const el = node.parentElement;
+
+    if (shouldIgnoreElement(el)) {
+      continue;
     }
 
-    ["placeholder", "title", "aria-label"].forEach(attr => {
-      const value = el.getAttribute?.(attr);
+    const text = (node.nodeValue || "").trim();
 
-      if (value && koreanRegex.test(value)) {
-        results.push({
-          type: attr,
-          tag: el.tagName,
-          id: el.id || "",
-          className: el.className || "",
-          text: value
-        });
-      }
+    if (!text || !koreanRegex.test(text)) {
+      continue;
+    }
+
+    const key =
+      `text|${el?.tagName}|${el?.id}|${text}`;
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    results.push({
+      type: "text",
+      tag: el?.tagName || "",
+      id: el?.id || "",
+      className:
+        typeof el?.className === "string"
+          ? el.className
+          : "",
+      text: text
     });
-  });
+  }
+
+  // 2. placeholder / title / aria-label 검사
+  document
+    .querySelectorAll(
+      "[placeholder], [title], [aria-label]"
+    )
+    .forEach(el => {
+      if (shouldIgnoreElement(el)) {
+        return;
+      }
+
+      ["placeholder", "title", "aria-label"]
+        .forEach(attr => {
+          const value = el.getAttribute(attr);
+
+          if (
+            !value ||
+            !koreanRegex.test(value)
+          ) {
+            return;
+          }
+
+          const key =
+            `${attr}|${el.tagName}|${el.id}|${value}`;
+
+          if (seen.has(key)) return;
+          seen.add(key);
+
+          results.push({
+            type: attr,
+            tag: el.tagName,
+            id: el.id || "",
+            className:
+              typeof el.className === "string"
+                ? el.className
+                : "",
+            text: value
+          });
+        });
+    });
 
   if (results.length) {
     console.warn(
@@ -891,7 +932,9 @@ Object.entries(AUTH_I18N).forEach(([lang, dict]) => {
       results
     );
   } else {
-    console.log("[i18n] 현재 화면의 UI 한국어 잔존 없음");
+    console.log(
+      "[i18n] 현재 화면의 UI 한국어 잔존 없음"
+    );
   }
 
   return results;
