@@ -842,6 +842,21 @@ Object.entries(AUTH_I18N).forEach(([lang, dict]) => {
     ) {
       return;
     }
+    
+    // 언어 선택기는 각 언어명을 원어로 표시하므로 검사에서 제외
+    const languageSelect =
+      document.getElementById("globalLanguageSelect");
+
+    if (
+      languageSelect &&
+      (
+        el === languageSelect ||
+        languageSelect.contains(el) ||
+        el.contains(languageSelect)
+      )
+    ) {
+      return;
+    }
 
     const text = (el.textContent || "").trim();
 
