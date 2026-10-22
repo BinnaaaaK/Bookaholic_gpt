@@ -776,8 +776,11 @@ Object.entries(AUTH_I18N).forEach(([lang, dict]) => {
   // 모바일이나 느린 기기에서 늦게 생성되는 요소까지 최종 확인
   setTimeout(() => {
     translateDom(document, false);
+  
+    // 번역이 모두 끝난 뒤 화면에 남은 한국어 자동 검사
+    auditUntranslatedKoreanUI();
   }, 250);
-}
+  }
 
   function initSelector(){
     const sel=document.getElementById("globalLanguageSelect"); if(!sel) return;
