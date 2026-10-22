@@ -1357,7 +1357,10 @@ function renderStats(){
     document.getElementById("statsYear").innerHTML = barChartHtml(years.map(y=>{
       const months = yearBestMonth[y];
       const bestM = Object.entries(months).sort((a,b)=>b[1]-a[1])[0];
-      return { label:`${y.slice(2)}'  ${parseInt(bestM[0])}월↑`, value: yearCount[y] };
+      return {
+      label: `${y.slice(2)}'  ${tr(`${parseInt(bestM[0])}월`)}↑`,
+      value: yearCount[y]
+    };
     }));
   }
 
