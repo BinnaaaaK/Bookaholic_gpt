@@ -809,6 +809,75 @@ Object.entries(AUTH_I18N).forEach(([lang, dict]) => {
     translateDom(tpl.content,true);
     return tpl.innerHTML;
   }
+  function auditUntranslatedKoreanUI() {
+  if (currentLang === "ko") return [];
+
+  const koreanRegex = /[가-힣]/;
+  const results = [];
+
+  const selectors = [
+    "button",
+    "label",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "option",
+    ".save-hint",
+    ".home-sub",
+    "[role='status']",
+    "[title]",
+    "[placeholder]",
+    "[aria-label]"
+  ];
+
+  document.querySelectorAll(selectors.join(",")).forEach(el => {
+    if (
+      el.closest(
+        "script, style, textarea, [contenteditable='true'], [data-i18n-ignore='true']"
+      )
+    ) {
+      return;
+    }
+
+    const text = (el.textContent || "").trim();
+
+    if (text && koreanRegex.test(text)) {
+      results.push({
+        type: "text",
+        tag: el.tagName,
+        id: el.id || "",
+        className: el.className || "",
+        text: text
+      });
+    }
+
+    ["placeholder", "title", "aria-label"].forEach(attr => {
+      const value = el.getAttribute?.(attr);
+
+      if (value && koreanRegex.test(value)) {
+        results.push({
+          type: attr,
+          tag: el.tagName,
+          id: el.id || "",
+          className: el.className || "",
+          text: value
+        });
+      }
+    });
+  });
+
+  if (results.length) {
+    console.warn(
+      `[i18n] 한국어가 남아 있는 UI ${results.length}개`,
+      results
+    );
+  } else {
+    console.log("[i18n] 현재 화면의 UI 한국어 잔존 없음");
+  }
+
+  return results;
+}
   function installDialogTranslation(){
     if(window.__mboDialogsLocalized) return;
     window.__mboDialogsLocalized=true;
