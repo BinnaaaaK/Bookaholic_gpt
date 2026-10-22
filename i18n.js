@@ -862,6 +862,25 @@ function auditUntranslatedKoreanUI() {
       return true;
     }
 
+        // 사용자가 직접 입력하거나 저장한 원문은
+    // 번역 누락 검사 대상에서도 제외
+    if (
+      el.matches?.(
+        [
+          ".card-title",
+          ".card-author",
+          ".genre-tag",
+          ".hbar-label",
+          ".quote-item",
+          ".shared-detail-title",
+          ".rl-title",
+          ".tag-chip"
+        ].join(",")
+      )
+    ) {
+      return true;
+    }
+
     // 언어 선택기는 각 언어명을 원어로 표시하므로 검사에서 제외
     if (
       languageSelect &&
