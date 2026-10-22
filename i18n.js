@@ -676,10 +676,39 @@ Object.entries(AUTH_I18N).forEach(([lang, dict]) => {
     const trail = (source.match(/\s*$/) || [""])[0];
     return lead + translated + trail;
   }
-  function shouldSkip(el){
-    if(!el) return true;
-    return !!el.closest("script,style,textarea,[contenteditable='true'],[data-i18n-ignore='true']");
+function shouldSkip(el){
+  if(!el) return true;
+
+  // 기존 번역 제외 영역
+  if(
+    el.closest(
+      "script,style,textarea,[contenteditable='true'],[data-i18n-ignore='true']"
+    )
+  ){
+    return true;
   }
+
+  // 사용자가 직접 입력하거나 저장한 원문은 번역하지 않음
+  // 책 제목 / 저자 / 장르 / 책 속 문구 등
+  if(
+    el.matches?.(
+      [
+        ".card-title",
+        ".card-author",
+        ".genre-tag",
+        ".hbar-label",
+        ".quote-item",
+        ".shared-detail-title",
+        ".rl-title",
+        ".tag-chip"
+      ].join(",")
+    )
+  ){
+    return true;
+  }
+
+  return false;
+}
   function translateTextNode(node, force=false){
     const parent = node.parentElement;
     if(!parent || shouldSkip(parent)) return;
