@@ -890,6 +890,7 @@ Object.entries(AUTH_I18N).forEach(([lang, dict]) => {
   }
   function init(){ initSelector(); installDialogTranslation(); translateDom(document,true); initObserver(); }
 
+  window.auditUntranslatedKoreanUI = auditUntranslatedKoreanUI;
   window.I18N = { LANGUAGES, setLanguage, getLanguage:()=>currentLang, translateDom, refresh:()=>translateDom(document,false), translateText:(s)=>translateCore(s,currentLang), translateHtmlString };
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
 })();
