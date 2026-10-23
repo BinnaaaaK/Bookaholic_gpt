@@ -1287,11 +1287,23 @@ function weekMonthLabel(monday){
 function buildWeekOptionLabel(offset, monday){
   const sunday = new Date(monday);
   sunday.setDate(sunday.getDate()+6);
-  const range = `${shortMonthDay(monday)}~${shortMonthDay(sunday)}`;
-  if(offset === 0) return `이번 주 · ${range}`;
-  if(offset === 1) return `지난주 · ${range}`;
-  if(offset === 2) return `지지난주 · ${range}`;
-  return `${weekMonthLabel(monday)} · ${range}`;
+
+  const range =
+    `${shortMonthDay(monday)}~${shortMonthDay(sunday)}`;
+
+  if(offset === 0) {
+    return `${tr("이번 주")} · ${range}`;
+  }
+
+  if(offset === 1) {
+    return `${tr("지난주")} · ${range}`;
+  }
+
+  if(offset === 2) {
+    return `${tr("지지난주")} · ${range}`;
+  }
+
+  return `${tr(weekMonthLabel(monday))} · ${range}`;
 }
 
 function renderStats(){
