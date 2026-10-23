@@ -662,7 +662,7 @@ function renderRewards(){
     bm += `<svg class="bm" width="18" height="34" viewBox="0 0 18 34" style="opacity:${asleep ? 0.6 : 1 - 0.75*p}"><path d="M2 1h14v32l-7-6-7 6z" fill="${asleep ? "none" : colors[k%colors.length]}" stroke="${asleep ? "var(--line-strong)" : "none"}" stroke-width="1.5" stroke-dasharray="${asleep ? "3 2" : "0"}"/></svg>`;
   }
   document.getElementById("bookmarkRow").innerHTML = bm || `<span class="rc-sub">아직 없어요</span>`;
-  document.getElementById("bookmarkText").textContent = `${earned}개`;
+  document.getElementById("bookmarkText").textContent = tr(`${earned}개`);
   document.getElementById("bookmarkNote").textContent =
     earned === 0 ? `독서한 날(타이머 기록) 3일마다 책갈피 1개를 받아요. 다음 책갈피까지 ${3 - (readDays % 3)}일.`
     : missed === 0 ? "책갈피가 모두 선명해요. 이대로 이어가 봐요!"
