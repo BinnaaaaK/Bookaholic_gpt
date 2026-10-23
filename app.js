@@ -1321,10 +1321,18 @@ function renderStats(){
       monday.setDate(monday.getDate() - offset*7);
       optionHtml.push(`<option value="${offset}">${buildWeekOptionLabel(offset, monday)}</option>`);
     }
-    if(weekSelect.dataset.filled !== "16-weeks-v1"){
+    
+    const currentUiLang =
+      window.I18N?.getLanguage?.() || "ko";
+    
+    const weekOptionsKey =
+      `16-weeks-v2-${currentUiLang}`;
+    
+    if(weekSelect.dataset.filled !== weekOptionsKey){
       weekSelect.innerHTML = optionHtml.join("");
-      weekSelect.dataset.filled = "16-weeks-v1";
+      weekSelect.dataset.filled = weekOptionsKey;
     }
+    
     weekSelect.value = String(statsWeekOffset);
 
     const selectedMonday = new Date(thisMonday);
