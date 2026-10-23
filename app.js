@@ -676,7 +676,7 @@ function renderRewards(){
   const early = earlyBadges();
   const sumDays = early.reduce((a,e)=>a+e.days, 0);
   let bh = milestones.map(m => `<div class="badge ${total>=m ? "on" : "locked"}"><div class="badge-icon">${total>=m ? "🏅" : "🔒"}</div><b>${m}권</b><span>${m===1 ? "첫 완독" : "달성"}</span></div>`).join("");
-  bh += early.map(e => `<div class="badge on early"><div class="badge-icon">⚡</div><b>${e.days}일 앞당김</b><span>${escapeHtml(e.title||"")}</span></div>`).join("");
+  bh += early.map(e => `<div class="badge on early"><div class="badge-icon">⚡</div><b>${e.days}일 앞당김</b><span data-i18n-ignore="true">${escapeHtml(e.title||"")}</span></div>`).join("");
   document.getElementById("badgeRow").innerHTML = bh;
   document.getElementById("badgeText").textContent = early.length ? `목표에 총 ${sumDays}일 가까워졌어요` : `${milestones.filter(m=>total>=m).length}개 획득`;
 }
