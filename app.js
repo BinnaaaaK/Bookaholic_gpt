@@ -3394,15 +3394,15 @@ document
 
   function renderRoutineGoalTrend(r){
     if(r.id!=="qt") return;
-    let panel=document.getElementById("routineGoalTrendPanel");
-    const screen=document.getElementById("routineDetailScreen");
-    if(!screen) return;
+    let panel=document.getElementById("bridgeRoutineGoalTrendPanel");
+    const screen=document.getElementById("bridgeScreen");
+    if(!screen || screen.classList.contains("hidden")) return;
 
     if(!panel){
       panel=document.createElement("section");
-      panel.id="routineGoalTrendPanel";
-      panel.className="goal-analytics-panel routine-goal-trend-panel";
-      const anchor=document.getElementById("routinePeriodStats")?.closest(".reward-card");
+      panel.id="bridgeRoutineGoalTrendPanel";
+      panel.className="goal-analytics-panel routine-goal-trend-panel bridge-trend-panel";
+      const anchor=document.getElementById("bridgeMotivation");
       if(anchor) anchor.insertAdjacentElement("afterend",panel);
       else screen.querySelector(".home-wrap")?.appendChild(panel);
     }
@@ -3520,17 +3520,19 @@ document
 
   function renderWakeTrend(r){
     if(r.id!=="wake_early") return;
-    let panel=document.getElementById("wakeTrendPanel");
-    const screen=document.getElementById("routineDetailScreen");
-    if(!screen) return;
+    let panel=document.getElementById("bridgeWakeTrendPanel");
+    const screen=document.getElementById("bridgeScreen");
+    if(!screen || screen.classList.contains("hidden")) return;
+
     if(!panel){
       panel=document.createElement("section");
-      panel.id="wakeTrendPanel";
-      panel.className="reward-card wake-trend-panel";
-      const anchor=document.getElementById("routinePeriodStats")?.closest(".reward-card");
+      panel.id="bridgeWakeTrendPanel";
+      panel.className="reward-card wake-trend-panel bridge-trend-panel";
+      const anchor=document.getElementById("bridgeMotivation");
       if(anchor) anchor.insertAdjacentElement("afterend",panel);
       else screen.querySelector(".home-wrap")?.appendChild(panel);
     }
+
     const years=wakeYears(r);
     const currentYear=new Date().getFullYear();
     if(!state.wakeYear || !years.includes(Number(state.wakeYear))) state.wakeYear=years.includes(currentYear)?currentYear:years[0];
@@ -3540,6 +3542,7 @@ document
       else if(state.wakeView==="week") state.wakePeriod=isoWeekNumber(new Date());
       else state.wakePeriod="all";
     }
+
     const [start,end]=dateRangeForWake(state.wakeView,Number(state.wakeYear),state.wakePeriod);
     const entries=(r.entries||[]).filter(e=>e.date&&e.time&&parseD(e.date)>=start&&parseD(e.date)<=end).sort((a,b)=>a.date.localeCompare(b.date));
     const vals=entries.map(e=>timeToMinutes(e.time)).filter(v=>v!=null);
@@ -3572,6 +3575,7 @@ document
         <div><span>${uxTr("가장 이른 기상")}</span><b>${minutesToTime(earliest)}</b></div>
       </div>
       <div class="wake-chart-wrap">${wakeSvg(entries,r.goalTime,start,end)}</div>`;
+
     panel.querySelector("#wakeViewSelect").value=state.wakeView;
     panel.querySelector("#wakeYearSelect").value=String(state.wakeYear);
     const psel=panel.querySelector("#wakePeriodSelect");
@@ -3830,17 +3834,32 @@ document
       };
     }
 
+    if(typeof renderBridge==="function"){
+      const baseRenderBridge=renderBridge;
+      renderBridge=function(routineId,...args){
+        const out=baseRenderBridge(routineId,...args);
+        const r=getRoutine(routineId);
+        requestAnimationFrame(()=>{
+          document.getElementById("bridgeWakeTrendPanel")?.remove();
+          document.getElementById("bridgeRoutineGoalTrendPanel")?.remove();
+
+          if(r?.id==="wake_early") renderWakeTrend(r);
+          if(r?.id==="qt") renderRoutineGoalTrend(r);
+
+          enhanceAccessibility(document);
+        });
+        return out;
+      };
+    }
+
     if(typeof renderRoutineDetail==="function"){
       const baseRenderRoutineDetail=renderRoutineDetail;
       renderRoutineDetail=function(routineId,...args){
         const out=baseRenderRoutineDetail(routineId,...args);
-        const r=getRoutine(routineId);
         requestAnimationFrame(()=>{
-          if(r?.id==="wake_early") renderWakeTrend(r);
-          else document.getElementById("wakeTrendPanel")?.remove();
-
-          if(r?.id==="qt") renderRoutineGoalTrend(r);
-          else document.getElementById("routineGoalTrendPanel")?.remove();
+          document.getElementById("wakeTrendPanel")?.remove();
+          document.getElementById("routineGoalTrendPanel")?.remove();
+          enhanceAccessibility(document);
         });
         return out;
       };
@@ -3889,8 +3908,10 @@ document
       setTimeout(()=>{
         ensureSettingsModal();
         renderReadingGoalAnalytics();
-        if(currentRoutineDetailId){
-          const r=getRoutine(currentRoutineDetailId);
+        if(currentBridgeId && !document.getElementById("bridgeScreen")?.classList.contains("hidden")){
+          const r=getRoutine(currentBridgeId);
+          document.getElementById("bridgeWakeTrendPanel")?.remove();
+          document.getElementById("bridgeRoutineGoalTrendPanel")?.remove();
           if(r?.id==="wake_early") renderWakeTrend(r);
           if(r?.id==="qt") renderRoutineGoalTrend(r);
         }
