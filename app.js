@@ -2012,7 +2012,10 @@ function renderDetail(){
   const inner = document.getElementById("overlay-inner");
   inner.innerHTML = `
     <div class="detail-top">
-      <button class="back-btn sans" id="backBtn">← 서재로</button>
+      <div class="detail-nav-actions">
+        <button class="back-btn sans" id="backBtn">← 서재로</button>
+        <button class="back-btn sans mbo-main-shortcut" id="bookMboHomeBtn">← MBO 메인</button>
+      </div>
       <select class="status-select" id="statusSelect">
         <option value="wishlist" ${b.status==="wishlist"?"selected":""}>읽고 싶음</option>
         <option value="not_started" ${b.status==="not_started"?"selected":""}>시작 전</option>
@@ -2122,12 +2125,18 @@ function renderDetail(){
       <input class="takeaway-input" id="takeawayInput" value="${escapeHtml(b.takeaway||"")}" placeholder="배운 점이나 써먹고 싶은 점을 한 줄로 적어보세요" />
     </div>
 
-    <div class="detail-section">
+    <div class="detail-section review-section">
       <h3 class="sans">독후감</h3>
-      <textarea class="review-area" id="reviewArea" placeholder="다 읽고 나서, 혹은 읽는 중간에도 생각을 남겨보세요.">${escapeHtml(b.review)}</textarea>
-      <div class="review-save-row">
-        <span class="save-hint sans" id="reviewSaveHint"></span>
-        <button id="saveReviewBtn">독후감 저장</button>
+      <div id="reviewSavedCard" class="review-saved-card ${b.review?"":"hidden"}" role="button" tabindex="0" aria-label="${escapeAttr(tr("독후감"))}">
+        <div class="review-saved-head"><span>📝 ${tr("독후감")}</span><button type="button" class="secondary review-edit-btn" id="editReviewBtn" title="${escapeAttr(tr("독후감"))}" aria-label="${escapeAttr(tr("독후감"))}">✏️</button></div>
+        <div class="review-saved-text" id="reviewSavedText">${b.review?escapeHtml(b.review).replace(/\n/g,"<br>"):""}</div>
+      </div>
+      <div id="reviewEditor" class="review-editor ${b.review?"hidden":""}">
+        <textarea class="review-area" id="reviewArea" placeholder="다 읽고 나서, 혹은 읽는 중간에도 생각을 남겨보세요.">${escapeHtml(b.review)}</textarea>
+        <div class="review-save-row">
+          <span class="save-hint sans" id="reviewSaveHint">💾 ${tr("자동 저장 상태")}</span>
+          <button id="finishReviewEditBtn" type="button">${tr("완료")}</button>
+        </div>
       </div>
     </div>
 
@@ -2137,6 +2146,13 @@ function renderDetail(){
   `;
 
   document.getElementById("backBtn").addEventListener("click", closeBook);
+  document.getElementById("bookMboHomeBtn")?.addEventListener("click", ()=>{
+    const overlay=document.getElementById("overlay");
+    overlay?.classList.remove("open","expanded");
+    overlay?.removeAttribute("style");
+    currentBookId=null;
+    showMbo();
+  });
 
   document.getElementById("statusSelect").addEventListener("change", async (e)=>{
     const newStatus = e.target.value;
@@ -2264,10 +2280,51 @@ function renderDetail(){
     });
   });
 
-  document.getElementById("saveReviewBtn").addEventListener("click", async ()=>{
-    await updateBook({ review: document.getElementById("reviewArea").value });
-    document.getElementById("reviewSaveHint").textContent = "저장됨";
-    setTimeout(()=>{ const h=document.getElementById("reviewSaveHint"); if(h) h.textContent=""; }, 1800);
+  const reviewArea=document.getElementById("reviewArea");
+  const reviewEditor=document.getElementById("reviewEditor");
+  const reviewCard=document.getElementById("reviewSavedCard");
+  const reviewSavedText=document.getElementById("reviewSavedText");
+  const reviewHint=document.getElementById("reviewSaveHint");
+  const editReviewBtn=document.getElementById("editReviewBtn");
+  const finishReviewEditBtn=document.getElementById("finishReviewEditBtn");
+  let reviewSaveTimer=null;
+
+  const openReviewEditor=()=>{
+    reviewEditor?.classList.remove("hidden");
+    reviewArea?.focus();
+  };
+  const syncReviewCard=(value)=>{
+    const text=String(value||"").trim();
+    if(!reviewCard || !reviewSavedText) return;
+    if(!text){ reviewCard.classList.add("hidden"); reviewSavedText.innerHTML=""; return; }
+    reviewSavedText.innerHTML=escapeHtml(text).replace(/\n/g,"<br>");
+    reviewCard.classList.remove("hidden");
+  };
+  const saveReviewNow=async()=>{
+    if(!reviewArea) return;
+    clearTimeout(reviewSaveTimer);
+    const value=reviewArea.value;
+    if(reviewHint) reviewHint.textContent=tr("저장 중…");
+    await updateBook({review:value});
+    syncReviewCard(value);
+    if(reviewHint) reviewHint.textContent=`${tr("저장됨")} ✓`;
+  };
+
+  reviewArea?.addEventListener("input",()=>{
+    if(reviewHint) reviewHint.textContent=tr("저장 중…");
+    clearTimeout(reviewSaveTimer);
+    reviewSaveTimer=setTimeout(saveReviewNow,850);
+  });
+  reviewArea?.addEventListener("blur",()=>{
+    clearTimeout(reviewSaveTimer);
+    saveReviewNow();
+  });
+  editReviewBtn?.addEventListener("click",(e)=>{ e.stopPropagation(); openReviewEditor(); });
+  reviewCard?.addEventListener("click",openReviewEditor);
+  reviewCard?.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();openReviewEditor();} });
+  finishReviewEditBtn?.addEventListener("click",async()=>{
+    await saveReviewNow();
+    reviewEditor?.classList.add("hidden");
   });
 
   document.getElementById("deleteBookBtn").addEventListener("click", async ()=>{
@@ -3230,11 +3287,34 @@ document
         toggle.setAttribute("aria-expanded","false");
       }
     });
-    dock.querySelector("#accountCloudAction").onclick=()=>document.getElementById("cloudBackupBtn")?.click();
+    dock.querySelector("#accountCloudAction").onclick=async()=>{
+      menu.classList.add("hidden");
+      toggle.setAttribute("aria-expanded","false");
+      setSaveState("syncing");
+      const ok=await saveData({backup:false});
+      showToast(ok?uxTr("저장되었습니다."):uxTr("저장에 실패했습니다."),ok?"success":"error");
+    };
     dock.querySelector("#accountPasswordAction").onclick=()=>document.getElementById("setPasswordBtn")?.click();
     dock.querySelector("#accountSettingsAction").onclick=openSettings;
-    dock.querySelector("#accountTourAction").onclick=()=>startOnboarding(true);
+    dock.querySelector("#accountTourAction").onclick=()=>{
+      menu.classList.add("hidden");
+      toggle.setAttribute("aria-expanded","false");
+      showMbo();
+      setTimeout(()=>startOnboarding(true),140);
+    };
     dock.querySelector("#accountLogoutAction").onclick=()=>document.getElementById("logoutBtn")?.click();
+
+    // Older builds or browser translations could leave a stray “설명” action.
+    // If one is present, make it useful instead of leaving a dead button.
+    dock.querySelectorAll("button").forEach(btn=>{
+      if(btn.textContent.trim()!=="설명") return;
+      if(btn.id==="accountTourAction"){
+        btn.textContent="🧭 사용 가이드";
+        btn.onclick=()=>{ showMbo(); setTimeout(()=>startOnboarding(true),140); };
+      }else{
+        btn.remove();
+      }
+    });
 
     document.querySelector(".global-auth-box")?.classList.add("ux-legacy-auth");
   }
@@ -3313,6 +3393,31 @@ document
     }).join("");
   }
 
+  function countTrendSvg(items, ariaLabel="trend"){
+    const width=720,height=230,pad={l:46,r:20,t:18,b:38};
+    if(!items?.length) return `<div class="analytics-empty">${uxTr("기록이 쌓이면 추이가 표시돼요.")}</div>`;
+    const max=Math.max(1,...items.flatMap(x=>[Number(x.value)||0,Number(x.target)||0]));
+    const x=i=>items.length===1?(pad.l+(width-pad.l-pad.r)/2):pad.l+(i/(items.length-1))*(width-pad.l-pad.r);
+    const y=v=>height-pad.b-(Number(v||0)/max)*(height-pad.t-pad.b);
+    let grid="";
+    const ticks=4;
+    for(let i=0;i<=ticks;i++){
+      const v=max*(i/ticks), yy=y(v);
+      grid+=`<line x1="${pad.l}" y1="${yy}" x2="${width-pad.r}" y2="${yy}" class="wake-grid-line"></line>
+             <text x="${pad.l-8}" y="${yy+4}" text-anchor="end" class="wake-axis-label">${Math.round(v*10)/10}</text>`;
+    }
+    const pts=items.map((it,i)=>`${x(i).toFixed(1)},${y(it.value).toFixed(1)}`).join(" ");
+    const targetPts=items.map((it,i)=>`${x(i).toFixed(1)},${y(it.target).toFixed(1)}`).join(" ");
+    const circles=items.map((it,i)=>`<circle cx="${x(i)}" cy="${y(it.value)}" r="4" class="wake-point"><title>${escapeHtml(it.label)} · ${it.value}</title></circle>`).join("");
+    const labels=items.map((it,i)=>`<text x="${x(i)}" y="${height-12}" text-anchor="middle" class="count-trend-label">${escapeHtml(it.label)}</text>`).join("");
+    return `<svg class="count-trend-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeAttr(ariaLabel)}">
+      ${grid}
+      ${targetPts?`<polyline points="${targetPts}" class="count-target-line"></polyline>`:""}
+      ${pts?`<polyline points="${pts}" class="wake-line count-trend-line"></polyline>`:""}
+      ${circles}${labels}
+    </svg>`;
+  }
+
   function renderReadingGoalAnalytics(){
     const host=document.querySelector("#library .stats-wrap") || document.querySelector(".stats-wrap");
     if(!host) return;
@@ -3345,7 +3450,11 @@ document
         <div><span>${uxTr("달성률")}</span><b>${series.items.length?Math.round(achieved/series.items.length*100):0}%</b></div>
       </div>
       <div class="goal-viz-chart" aria-label="${uxTr("독서 목표 추이")}">${goalBarsHtml(series.items)}</div>
-      <div class="goal-viz-legend"><span><i class="goal-viz-legend-fill"></i>${uxTr("실적")}</span><span><i class="goal-viz-legend-target"></i>${uxTr("목표선")}</span></div>`;
+      <div class="goal-viz-legend"><span><i class="goal-viz-legend-fill"></i>${uxTr("실적")}</span><span><i class="goal-viz-legend-target"></i>${uxTr("목표선")}</span></div>
+      <div class="secondary-trend-block">
+        <div class="secondary-trend-head"><b>📈 ${uxTr("독서 목표 추이")}</b><span>${uxTr("실적")} · ${uxTr("목표선")}</span></div>
+        <div class="count-trend-wrap">${countTrendSvg(series.items,uxTr("독서 목표 추이"))}</div>
+      </div>`;
     panel.querySelectorAll("[data-reading-view]").forEach(btn=>btn.onclick=()=>{
       state.readingView=btn.dataset.readingView;
       localStorage.setItem("bookaholic-reading-goal-view",state.readingView);
@@ -3431,7 +3540,11 @@ document
         <div><span>${uxTr("달성률")}</span><b>${series.items.length?Math.round(achieved/series.items.length*100):0}%</b></div>
       </div>
       <div class="goal-viz-chart" aria-label="${uxTr("큐티")}">${goalBarsHtml(series.items)}</div>
-      <div class="goal-viz-legend"><span><i class="goal-viz-legend-fill"></i>${uxTr("실적")}</span><span><i class="goal-viz-legend-target"></i>${uxTr("목표선")}</span></div>`;
+      <div class="goal-viz-legend"><span><i class="goal-viz-legend-fill"></i>${uxTr("실적")}</span><span><i class="goal-viz-legend-target"></i>${uxTr("목표선")}</span></div>
+      <div class="secondary-trend-block">
+        <div class="secondary-trend-head"><b>📈 ${uxTr("큐티")} · ${uxTr("목표")}</b><span>${uxTr("실적")} · ${uxTr("목표선")}</span></div>
+        <div class="count-trend-wrap">${countTrendSvg(series.items,uxTr("큐티"))}</div>
+      </div>`;
 
     panel.querySelectorAll("[data-qt-view]").forEach(btn=>btn.onclick=()=>{
       state.qtView=btn.dataset.qtView;
@@ -3964,10 +4077,54 @@ document
     }
   };
 
+  const GUIDE_EXTRA = {
+    ko:{
+      readStickerTitle:"연속 독서 · 출석 스티커",readStickerBody:"최근 독서 출석 흐름을 날짜별 스티커로 보여줍니다. 오늘 읽으면 오늘 칸이 채워지고 연속 기록을 직관적으로 확인할 수 있습니다.",
+      readBookmarkTitle:"나의 책갈피",readBookmarkBody:"완독과 독서 활동이 쌓일수록 책갈피가 채워집니다. 기록이 이어지고 있는지 가볍게 확인하는 보상 요소입니다.",
+      readBadgeTitle:"뱃지",readBadgeBody:"첫 완독, 누적 완독, 목표보다 빠른 완독, 누적 독서일 같은 조건을 달성하면 뱃지가 열립니다. 잠긴 뱃지는 다음 목표를 알려줍니다.",
+      wakeControlsTitle:"기간 선택",wakeControlsBody:"주별·월별·분기별·연도별 보기와 연도·기간을 선택합니다. 선택한 범위에 맞춰 아래 기상 그래프와 요약 수치가 함께 바뀝니다.",
+      wakeChartTitle:"기상시간 선 그래프",wakeChartBody:"파란 선은 실제 기상시간의 흐름이고 점선은 목표 기상시간입니다. 선이 목표선보다 아래쪽에 있을수록 더 이른 시간에 일어난 기록입니다.",
+      lineChartTitle:"선형 추이",lineChartBody:"막대그래프와 같은 기록을 선으로도 연결해 변화 방향을 더 쉽게 볼 수 있습니다. 파란 선은 실제 기록, 점선은 목표 기준입니다."
+    },
+    en:{
+      readStickerTitle:"Reading streak stickers",readStickerBody:"A date-by-date view of recent reading attendance. Reading today fills today's sticker and makes streaks easy to spot.",
+      readBookmarkTitle:"My bookmarks",readBookmarkBody:"Bookmarks fill as completed books and reading activity accumulate, giving you a light visual reward for consistency.",
+      readBadgeTitle:"Badges",readBadgeBody:"Badges unlock for milestones such as your first completion, cumulative completions, finishing early, and accumulated reading days. Locked badges hint at the next milestone.",
+      wakeControlsTitle:"Choose a period",wakeControlsBody:"Switch between week, month, quarter, and year, then choose the year and period. The summary and graph update together.",
+      wakeChartTitle:"Wake-up line chart",wakeChartBody:"The blue line is your actual wake-up time and the dashed line is your target. Points lower than the target line represent earlier wake-ups.",
+      lineChartTitle:"Line trend",lineChartBody:"The same records are connected as a line so direction is easier to see. The blue line is actual performance and the dashed line is the target."
+    },
+    ja:{
+      readStickerTitle:"連続読書・出席ステッカー",readStickerBody:"最近の読書出席を日付ごとのステッカーで表示します。今日読めば今日の欄が埋まり、連続記録を直感的に確認できます。",
+      readBookmarkTitle:"私のしおり",readBookmarkBody:"読了や読書活動が積み重なるとしおりが増え、継続の流れを軽く確認できるごほうび要素です。",
+      readBadgeTitle:"バッジ",readBadgeBody:"初読了、累計読了、目標より早い読了、累計読書日などの条件でバッジが開きます。ロック中のバッジは次の目標の目安です。",
+      wakeControlsTitle:"期間選択",wakeControlsBody:"週・月・四半期・年表示と年・期間を選びます。選択範囲に合わせて下のグラフと要約が変わります。",
+      wakeChartTitle:"起床時間の折れ線",wakeChartBody:"青い線が実際の起床時間、点線が目標時刻です。目標線より下にあるほど早く起きた記録です。",
+      lineChartTitle:"折れ線推移",lineChartBody:"棒グラフと同じ記録を線でつなぎ、変化の方向を見やすくします。青線が実績、点線が目標です。"
+    },
+    "zh-CN":{
+      readStickerTitle:"连续阅读·签到贴纸",readStickerBody:"按日期显示最近的阅读签到。今天阅读后当天贴纸会点亮，也能直观看到连续记录。",
+      readBookmarkTitle:"我的书签",readBookmarkBody:"随着完读和阅读活动累积，书签会逐渐填满，是用来轻松感受持续性的奖励元素。",
+      readBadgeTitle:"徽章",readBadgeBody:"首次完读、累计完读、提前完成、累计阅读天数等条件达成后会解锁徽章。未解锁徽章提示下一个目标。",
+      wakeControlsTitle:"选择期间",wakeControlsBody:"切换周、月、季度、年度，并选择年份和期间。下方摘要与图表会随选择同步更新。",
+      wakeChartTitle:"起床时间折线图",wakeChartBody:"蓝线是实际起床时间，虚线是目标时间。点位低于目标线表示当天起得更早。",
+      lineChartTitle:"折线趋势",lineChartBody:"把与柱状图相同的记录连接成折线，更容易观察变化方向。蓝线为实际记录，虚线为目标。"
+    },
+    "zh-TW":{
+      readStickerTitle:"連續閱讀・簽到貼紙",readStickerBody:"依日期顯示最近的閱讀簽到。今天閱讀後會點亮今天的貼紙，也能直觀看到連續紀錄。",
+      readBookmarkTitle:"我的書籤",readBookmarkBody:"隨著完讀與閱讀活動累積，書籤會逐漸填滿，是用來輕鬆感受持續性的獎勵元素。",
+      readBadgeTitle:"徽章",readBadgeBody:"首次完讀、累計完讀、提前完成、累計閱讀天數等條件達成後會解鎖徽章。未解鎖徽章提示下一個目標。",
+      wakeControlsTitle:"選擇期間",wakeControlsBody:"切換週、月、季、年，並選擇年份與期間。下方摘要與圖表會同步更新。",
+      wakeChartTitle:"起床時間折線圖",wakeChartBody:"藍線是實際起床時間，虛線是目標時間。點位低於目標線代表當天起得更早。",
+      lineChartTitle:"折線趨勢",lineChartBody:"把與長條圖相同的紀錄連成折線，更容易看出變化方向。藍線為實際紀錄，虛線為目標。"
+    }
+  };
+
   function guideT(key){
     const lang=guideLang();
     const pack=GUIDE_TEXT[lang] || GUIDE_TEXT.en;
-    return pack[key] || GUIDE_TEXT.en[key] || key;
+    const extra=GUIDE_EXTRA[lang] || GUIDE_EXTRA.en;
+    return extra[key] || GUIDE_EXTRA.en[key] || pack[key] || GUIDE_TEXT.en[key] || key;
   }
 
   function readingGuideSteps(){
@@ -3977,7 +4134,10 @@ document
       {target:"#homeScreen .home-baseline",title:guideT("readBaselineTitle"),body:guideT("readBaselineBody"),raw:true},
       {target:"#homeScreen .home-shelf",title:guideT("readShelfTitle"),body:guideT("readShelfBody"),raw:true},
       {target:"#enterLibraryBtn",title:guideT("readLibraryTitle"),body:guideT("readLibraryBody"),raw:true},
-      {target:"#homeScreen .reward-section .reward-card:first-child",title:guideT("readWeeklyTitle"),body:guideT("readWeeklyBody"),raw:true}
+      {target:"#homeScreen .reward-section .reward-card:first-child",title:guideT("readWeeklyTitle"),body:guideT("readWeeklyBody"),raw:true},
+      {target:"#stickerRow",title:guideT("readStickerTitle"),body:guideT("readStickerBody"),raw:true},
+      {target:"#bookmarkRow",title:guideT("readBookmarkTitle"),body:guideT("readBookmarkBody"),raw:true},
+      {target:"#badgeRow",title:guideT("readBadgeTitle"),body:guideT("readBadgeBody"),raw:true}
     ];
   }
 
@@ -3989,9 +4149,12 @@ document
     ];
     if(r?.id==="qt"){
       steps.push({target:"#bridgeRoutineGoalTrendPanel",title:guideT("qtTrendTitle"),body:guideT("qtTrendBody"),raw:true});
+      steps.push({target:"#bridgeRoutineGoalTrendPanel .secondary-trend-block",title:guideT("lineChartTitle"),body:guideT("lineChartBody"),raw:true});
     }
     if(r?.id==="wake_early"){
       steps.push({target:"#bridgeWakeTrendPanel",title:guideT("wakeTrendTitle"),body:guideT("wakeTrendBody"),raw:true});
+      steps.push({target:"#bridgeWakeTrendPanel .wake-controls",title:guideT("wakeControlsTitle"),body:guideT("wakeControlsBody"),raw:true});
+      steps.push({target:"#bridgeWakeTrendPanel .wake-chart-wrap",title:guideT("wakeChartTitle"),body:guideT("wakeChartBody"),raw:true});
     }
     steps.push(
       {target:"#bridgeMotivation",title:guideT("motivationTitle"),body:guideT("motivationBody"),raw:true},
@@ -4007,6 +4170,7 @@ document
       {target:"#library .contrib-wrap",title:guideT("libraryGridTitle"),body:guideT("libraryGridBody"),raw:true},
       {target:"#library .stats-wrap",title:guideT("libraryStatsTitle"),body:guideT("libraryStatsBody"),raw:true},
       {target:"#readingGoalAnalytics",title:guideT("libraryGoalTitle"),body:guideT("libraryGoalBody"),raw:true},
+      {target:"#readingGoalAnalytics .secondary-trend-block",title:guideT("lineChartTitle"),body:guideT("lineChartBody"),raw:true},
       {target:"#library .toolbar:not(.share-toolbar)",title:guideT("libraryFilterTitle"),body:guideT("libraryFilterBody"),raw:true},
       {target:"#library .share-toolbar",title:guideT("libraryShareTitle"),body:guideT("libraryShareBody"),raw:true},
       {target:"#library #grid:not(.hidden), #library #board:not(.hidden)",title:guideT("libraryBooksTitle"),body:guideT("libraryBooksBody"),raw:true}
@@ -4215,6 +4379,38 @@ document
     if(toast){ toast.setAttribute("role","status"); toast.setAttribute("aria-live","polite"); }
   }
 
+  function ensureDeepMboNavigation(){
+    const goMbo=()=>showMbo();
+
+    const libraryBack=document.getElementById("backHomeBtn");
+    if(libraryBack){
+      let btn=document.getElementById("libraryMboMainBtn");
+      if(!btn){
+        btn=document.createElement("button");
+        btn.id="libraryMboMainBtn";
+        btn.type="button";
+        btn.className="home-link mbo-main-inline";
+        btn.textContent="← MBO 메인";
+        libraryBack.insertAdjacentElement("afterend",btn);
+      }
+      btn.onclick=goMbo;
+    }
+
+    const detailBack=document.getElementById("routineDetailBackBtn");
+    if(detailBack){
+      let btn=document.getElementById("routineDetailMboBtn");
+      if(!btn){
+        btn=document.createElement("button");
+        btn.id="routineDetailMboBtn";
+        btn.type="button";
+        btn.className="home-link mbo-main-inline";
+        btn.textContent="← MBO 메인";
+        detailBack.insertAdjacentElement("afterend",btn);
+      }
+      btn.onclick=goMbo;
+    }
+  }
+
   function ensureSkipLink(){
     if(document.getElementById("uxSkipLink")) return;
     const a=document.createElement("a");
@@ -4296,6 +4492,7 @@ document
         requestAnimationFrame(()=>{
           // renderStats may add the reading-goal analytics on the next frame.
           setTimeout(()=>{
+            ensureDeepMboNavigation();
             ensureContextGuideButton("library",()=>startLibraryGuide(true));
             startLibraryGuide(false);
             enhanceAccessibility(document);
@@ -4351,6 +4548,7 @@ document
         requestAnimationFrame(()=>{
           document.getElementById("wakeTrendPanel")?.remove();
           document.getElementById("routineGoalTrendPanel")?.remove();
+          ensureDeepMboNavigation();
           ensureContextGuideButton("routineDetailScreen",()=>startRoutineDetailGuide(r,true));
           setTimeout(()=>startRoutineDetailGuide(r,false),160);
           enhanceAccessibility(document);
@@ -4385,6 +4583,7 @@ document
     ensureAccountDock();
     ensureOnboardingUi();
     ensureSkipLink();
+    ensureDeepMboNavigation();
     installRuntimeWrappers();
     enhanceAccessibility(document);
 
