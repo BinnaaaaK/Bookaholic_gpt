@@ -2736,3 +2736,133 @@ body.ux-reduce-motion *::after{
     font-size:6px !important;
   }
 }
+
+
+/* ========================================================================== 
+   Bookaholic 025 — navigation, trend lines, review autosave
+   ========================================================================== */
+.detail-nav-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.mbo-main-shortcut,
+.mbo-main-inline{
+  color:var(--cloth) !important;
+}
+#libraryMboMainBtn,
+#routineDetailMboBtn{
+  margin-left:10px;
+}
+
+.secondary-trend-block{
+  margin-top:16px;
+  padding-top:14px;
+  border-top:1px solid var(--line);
+}
+.secondary-trend-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+}
+.secondary-trend-head b{
+  font-size:12.5px;
+  color:var(--ink);
+}
+.secondary-trend-head span{
+  color:var(--ink-soft);
+  font-size:10.5px;
+}
+.count-trend-wrap{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--paper);
+  padding:8px;
+  overflow:hidden;
+}
+.count-trend-svg{
+  width:100%;
+  height:auto;
+  min-height:180px;
+  display:block;
+}
+.count-trend-line{
+  stroke:#6fb6ff;
+}
+.count-target-line{
+  fill:none;
+  stroke:#f2b84b;
+  stroke-width:2;
+  stroke-dasharray:7 6;
+  opacity:.95;
+}
+.count-trend-label{
+  fill:var(--ink-soft);
+  font:500 9px/1 "Avenir Next","Segoe UI",sans-serif;
+}
+
+.review-saved-card{
+  margin-top:8px;
+  padding:14px 15px;
+  border-radius:10px;
+  border:1px solid rgba(233,180,77,.62);
+  background:linear-gradient(135deg,rgba(234,184,78,.19),rgba(217,115,13,.10));
+  box-shadow:inset 3px 0 0 #e9b44d;
+  cursor:pointer;
+  transition:border-color .16s ease, transform .16s ease, background .16s ease;
+}
+.review-saved-card:hover{
+  border-color:#e9b44d;
+  background:linear-gradient(135deg,rgba(234,184,78,.25),rgba(217,115,13,.13));
+  transform:translateY(-1px);
+}
+.review-saved-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:9px;
+  color:#f1c86f;
+  font-size:12px;
+  font-weight:700;
+}
+.review-edit-btn{
+  min-height:32px !important;
+  padding:5px 10px !important;
+  font-size:11px !important;
+}
+.review-saved-text{
+  color:var(--ink);
+  font-size:13.5px;
+  line-height:1.75;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.review-editor{
+  margin-top:10px;
+}
+.review-editor .review-save-row{
+  align-items:center;
+}
+.review-editor .save-hint{
+  color:var(--cloth);
+}
+
+@media(max-width:700px){
+  .secondary-trend-head{
+    align-items:flex-start;
+    flex-direction:column;
+    gap:3px;
+  }
+  .count-trend-svg{ min-height:150px; }
+  #libraryMboMainBtn,
+  #routineDetailMboBtn{ margin-left:6px; }
+  .detail-top{
+    align-items:flex-start;
+    gap:10px;
+  }
+}
