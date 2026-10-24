@@ -2312,6 +2312,31 @@ function updateTimerDisplay(){
   if(el) el.textContent = `${h}:${m}:${s}`;
 }
 
+
+function validatePasswordStrength(password){
+  if(typeof password !== "string" || password.length < 8){
+    return "비밀번호는 8자 이상이어야 합니다.";
+  }
+  if(!/[A-Z]/.test(password)){
+    return "비밀번호에 대문자를 1자 이상 포함해 주세요.";
+  }
+  if(!/[a-z]/.test(password)){
+    return "비밀번호에 소문자를 1자 이상 포함해 주세요.";
+  }
+  if(!/\d/.test(password)){
+    return "비밀번호에 숫자를 1자 이상 포함해 주세요.";
+  }
+  if(!/[^A-Za-z0-9]/.test(password)){
+    return "비밀번호에 특수문자를 1자 이상 포함해 주세요.";
+  }
+  return "";
+}
+
+function signUpLooksLikeExistingAccount(data){
+  const identities = data?.user?.identities;
+  return Array.isArray(identities) && identities.length === 0;
+}
+
 // ---------- Supabase GitHub Login ----------
 async function signInWithGitHub() {
   const { error } = await supabaseClient.auth.signInWithOAuth({
@@ -2562,9 +2587,10 @@ document.getElementById("setPasswordSaveBtn")?.addEventListener("click", async (
     return;
   }
 
-  if (password.length < 8) {
+  const passwordIssue = validatePasswordStrength(password);
+  if (passwordIssue) {
     if (message) {
-      message.textContent = "비밀번호는 최소 8자 이상이어야 합니다.";
+      message.textContent = passwordIssue;
     }
     return;
   }
@@ -2640,6 +2666,14 @@ document.getElementById("emailSignUpBtn")?.addEventListener("click", async () =>
     return;
   }
 
+  const passwordIssue = validatePasswordStrength(password);
+  if (passwordIssue) {
+    if (message) {
+      message.textContent = passwordIssue;
+    }
+    return;
+  }
+
   if (message) {
     message.textContent = "회원가입 처리 중...";
   }
@@ -2659,6 +2693,14 @@ document.getElementById("emailSignUpBtn")?.addEventListener("click", async () =>
       message.textContent = "회원가입에 실패했습니다: " + error.message;
     }
 
+    return;
+  }
+
+  if (signUpLooksLikeExistingAccount(data)) {
+    if (message) {
+      message.textContent =
+        "이미 가입된 이메일일 수 있습니다. 로그인하거나 비밀번호 찾기를 이용해 주세요.";
+    }
     return;
   }
 
@@ -2972,3 +3014,802 @@ async function backupDataToSupabase() {
 document
   .getElementById("cloudBackupBtn")
   ?.addEventListener("click", backupDataToSupabase);
+/* ==========================================================================
+   Bookaholic UX Suite 2–14
+   - Account menu / settings / save-state / reading-goal analytics
+   - Wake-up trend explorer / guided onboarding / integrated insights
+   - Extra badges / accessibility / diagnostics
+   ========================================================================== */
+(() => {
+  const UX_PREFS_KEY = "bookaholic-ux-prefs-v1";
+  const ONBOARDING_KEY = "bookaholic-onboarding-v1";
+  const LOCAL_SAVE_META_PREFIX = "bookaholic-local-save-at:";
+  const CLOUD_SAVE_META_PREFIX = "bookaholic-cloud-save-at:";
+  const state = {
+    readingView: localStorage.getItem("bookaholic-reading-goal-view") || "week",
+    wakeView: localStorage.getItem("bookaholic-wake-view") || "month",
+    wakeYear: null,
+    wakePeriod: null,
+    onboardingIndex: 0,
+    onboardingSteps: [],
+    saveTimer: null
+  };
+
+  const uxTr = (text) => {
+    try { return tr(text); } catch(_) { return String(text); }
+  };
+
+  function getPrefs(){
+    try{
+      return {
+        fontScale: 100,
+        compact: false,
+        reduceMotion: false,
+        ...JSON.parse(localStorage.getItem(UX_PREFS_KEY) || "{}")
+      };
+    }catch(_){
+      return { fontScale:100, compact:false, reduceMotion:false };
+    }
+  }
+
+  function savePrefs(next){
+    const prefs={...getPrefs(),...next};
+    localStorage.setItem(UX_PREFS_KEY,JSON.stringify(prefs));
+    applyPrefs(prefs);
+    return prefs;
+  }
+
+  function applyPrefs(prefs=getPrefs()){
+    document.documentElement.style.setProperty("--ux-font-scale", String((prefs.fontScale||100)/100));
+    document.body.classList.toggle("ux-compact", !!prefs.compact);
+    document.body.classList.toggle("ux-reduce-motion", !!prefs.reduceMotion);
+  }
+
+  function currentSessionEmail(session){
+    return session?.user?.email ||
+      session?.user?.user_metadata?.user_name ||
+      session?.user?.user_metadata?.preferred_username ||
+      "";
+  }
+
+  function ensureSaveIndicator(){
+    let el=document.getElementById("saveStateIndicator");
+    if(el) return el;
+    el=document.createElement("div");
+    el.id="saveStateIndicator";
+    el.className="save-state-indicator sans";
+    el.setAttribute("role","status");
+    el.setAttribute("aria-live","polite");
+    el.innerHTML=`<span class="save-state-dot"></span><span class="save-state-text">${uxTr("저장됨")}</span>`;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function setSaveState(kind, customText=""){
+    const el=ensureSaveIndicator();
+    clearTimeout(state.saveTimer);
+    el.dataset.state=kind;
+    const textEl=el.querySelector(".save-state-text");
+    const labels={
+      saving:"저장 중…",
+      saved:"저장됨",
+      syncing:"클라우드 동기화 중…",
+      offline:"오프라인 · 기기에 저장됨",
+      error:"저장 실패"
+    };
+    textEl.textContent=customText || uxTr(labels[kind] || labels.saved);
+    el.classList.add("visible");
+    if(kind==="saved"){
+      state.saveTimer=setTimeout(()=>el.classList.remove("visible"),2200);
+    }
+  }
+
+  function ensureSettingsModal(){
+    if(document.getElementById("uxSettingsModal")) return;
+    const modal=document.createElement("div");
+    modal.id="uxSettingsModal";
+    modal.className="modal hidden ux-settings-modal";
+    modal.innerHTML=`
+      <div class="modal-box ux-settings-box" role="dialog" aria-modal="true" aria-labelledby="uxSettingsTitle">
+        <div class="ux-settings-head">
+          <div>
+            <p class="home-eyebrow">${uxTr("설정")}</p>
+            <h3 id="uxSettingsTitle">${uxTr("사용 환경")}</h3>
+          </div>
+          <button type="button" class="secondary ux-icon-only" id="uxSettingsClose" aria-label="${uxTr("닫기")}">×</button>
+        </div>
+
+        <div class="ux-setting-group">
+          <label for="uxLanguageSelect">${uxTr("언어")}</label>
+          <select id="uxLanguageSelect" class="ux-setting-select"></select>
+        </div>
+
+        <div class="ux-setting-group">
+          <div class="ux-setting-row">
+            <label for="uxFontScale">${uxTr("글자 크기")}</label>
+            <span id="uxFontScaleValue" class="rc-sub"></span>
+          </div>
+          <input id="uxFontScale" type="range" min="90" max="120" step="5" />
+        </div>
+
+        <label class="ux-setting-toggle">
+          <input id="uxCompactMode" type="checkbox" />
+          <span><b>${uxTr("컴팩트 모드")}</b><small>${uxTr("작은 화면에서 더 많은 내용을 보여줘요.")}</small></span>
+        </label>
+
+        <label class="ux-setting-toggle">
+          <input id="uxReduceMotion" type="checkbox" />
+          <span><b>${uxTr("애니메이션 줄이기")}</b><small>${uxTr("화면 전환 움직임을 최소화해요.")}</small></span>
+        </label>
+
+        <div class="ux-settings-actions">
+          <button type="button" class="secondary" id="uxRestartTour">${uxTr("사용 가이드 다시 보기")}</button>
+          <button type="button" class="secondary" id="uxRunQa">${uxTr("화면 자가 점검")}</button>
+          <button type="button" id="uxSaveNow">${uxTr("지금 저장")}</button>
+        </div>
+        <p class="rc-note">${uxTr("화면은 휴대폰·태블릿·PC 크기에 맞춰 자동으로 조정됩니다.")}</p>
+      </div>`;
+    document.body.appendChild(modal);
+
+    const lang=modal.querySelector("#uxLanguageSelect");
+    const languages=window.I18N?.LANGUAGES || [];
+    lang.innerHTML=languages.map(x=>`<option value="${escapeAttr(x.code)}">${escapeHtml(x.label)}</option>`).join("");
+    lang.value=window.I18N?.getLanguage?.() || "ko";
+
+    const prefs=getPrefs();
+    const range=modal.querySelector("#uxFontScale");
+    const rangeVal=modal.querySelector("#uxFontScaleValue");
+    range.value=String(prefs.fontScale||100);
+    rangeVal.textContent=`${range.value}%`;
+    modal.querySelector("#uxCompactMode").checked=!!prefs.compact;
+    modal.querySelector("#uxReduceMotion").checked=!!prefs.reduceMotion;
+
+    modal.querySelector("#uxSettingsClose").onclick=()=>modal.classList.add("hidden");
+    modal.addEventListener("click",(e)=>{ if(e.target===modal) modal.classList.add("hidden"); });
+    lang.onchange=()=>window.I18N?.setLanguage?.(lang.value);
+    range.oninput=()=>{ rangeVal.textContent=`${range.value}%`; savePrefs({fontScale:Number(range.value)}); };
+    modal.querySelector("#uxCompactMode").onchange=(e)=>savePrefs({compact:e.target.checked});
+    modal.querySelector("#uxReduceMotion").onchange=(e)=>savePrefs({reduceMotion:e.target.checked});
+    modal.querySelector("#uxRestartTour").onclick=()=>{ modal.classList.add("hidden"); startOnboarding(true); };
+    modal.querySelector("#uxRunQa").onclick=()=>{
+      const result=window.runBookaholicQA?.() || [];
+      const failed=result.filter(x=>!x.pass).length;
+      showToast(failed?`${failed}${uxTr("개 점검 항목을 확인해 주세요.")}`:uxTr("자가 점검을 통과했습니다."),failed?"error":"success");
+    };
+    modal.querySelector("#uxSaveNow").onclick=async()=>{
+      setSaveState("saving");
+      const ok=await saveData();
+      showToast(ok?uxTr("저장되었습니다."):uxTr("저장에 실패했습니다."),ok?"success":"error");
+    };
+  }
+
+  function openSettings(){
+    ensureSettingsModal();
+    const modal=document.getElementById("uxSettingsModal");
+    const lang=modal.querySelector("#uxLanguageSelect");
+    if(lang) lang.value=window.I18N?.getLanguage?.() || "ko";
+    modal.classList.remove("hidden");
+  }
+
+  function ensureAccountDock(){
+    if(document.getElementById("accountDock")) return;
+    const dock=document.createElement("div");
+    dock.id="accountDock";
+    dock.className="account-dock sans hidden";
+    dock.innerHTML=`
+      <button type="button" id="accountDockToggle" class="account-dock-toggle" aria-haspopup="menu" aria-expanded="false">
+        <span class="account-avatar">●</span>
+        <span class="account-dock-label">${uxTr("계정")}</span>
+        <span aria-hidden="true">⌄</span>
+      </button>
+      <div id="accountDockMenu" class="account-dock-menu hidden" role="menu">
+        <div class="account-dock-user">
+          <span>${uxTr("로그인 계정")}</span>
+          <strong id="accountDockEmail">—</strong>
+        </div>
+        <button type="button" id="accountCloudAction" role="menuitem">☁️ ${uxTr("클라우드 백업")}</button>
+        <button type="button" id="accountPasswordAction" role="menuitem">🔐 ${uxTr("비밀번호 설정")}</button>
+        <button type="button" id="accountSettingsAction" role="menuitem">⚙️ ${uxTr("설정")}</button>
+        <button type="button" id="accountTourAction" role="menuitem">🧭 ${uxTr("사용 가이드")}</button>
+        <div class="account-dock-sep"></div>
+        <button type="button" id="accountLogoutAction" class="danger-link" role="menuitem">${uxTr("로그아웃")}</button>
+      </div>`;
+    document.body.appendChild(dock);
+
+    const toggle=dock.querySelector("#accountDockToggle");
+    const menu=dock.querySelector("#accountDockMenu");
+    toggle.onclick=()=>{
+      const open=menu.classList.toggle("hidden")===false;
+      toggle.setAttribute("aria-expanded",String(open));
+    };
+    document.addEventListener("click",(e)=>{
+      if(!dock.contains(e.target)){
+        menu.classList.add("hidden");
+        toggle.setAttribute("aria-expanded","false");
+      }
+    });
+    dock.querySelector("#accountCloudAction").onclick=()=>document.getElementById("cloudBackupBtn")?.click();
+    dock.querySelector("#accountPasswordAction").onclick=()=>document.getElementById("setPasswordBtn")?.click();
+    dock.querySelector("#accountSettingsAction").onclick=openSettings;
+    dock.querySelector("#accountTourAction").onclick=()=>startOnboarding(true);
+    dock.querySelector("#accountLogoutAction").onclick=()=>document.getElementById("logoutBtn")?.click();
+
+    document.querySelector(".global-auth-box")?.classList.add("ux-legacy-auth");
+  }
+
+  function updateAccountDock(session){
+    ensureAccountDock();
+    const dock=document.getElementById("accountDock");
+    if(session?.user && !document.body.classList.contains("auth-locked")){
+      dock.classList.remove("hidden");
+      dock.querySelector("#accountDockEmail").textContent=currentSessionEmail(session)||uxTr("로그인됨");
+    }else{
+      dock.classList.add("hidden");
+      dock.querySelector("#accountDockMenu")?.classList.add("hidden");
+    }
+  }
+
+  function completedBooksBetween(start,end){
+    return data.books.filter(b=>{
+      if(b.status!=="done" || !b.endDate) return false;
+      const d=parseD(b.endDate);
+      return d>=start && d<=end;
+    }).length;
+  }
+
+  function readingGoalSeries(view){
+    const goal=Math.max(1,Number(data.weeklyGoal)||2);
+    const now=new Date(); now.setHours(0,0,0,0);
+    if(view==="week"){
+      const base=startOfWeekMonday(now);
+      const items=[];
+      for(let offset=7; offset>=0; offset--){
+        const s=new Date(base); s.setDate(s.getDate()-offset*7);
+        const e=new Date(s); e.setDate(e.getDate()+6);
+        items.push({
+          label:`${s.getMonth()+1}/${s.getDate()}`,
+          value:completedBooksBetween(s,e),
+          target:goal
+        });
+      }
+      return {items,target:goal,targetLabel:`${goal}${uxTr("권")}/${uxTr("주")}`};
+    }
+    if(view==="month"){
+      const year=statsMonthYear || now.getFullYear();
+      const target=Math.max(1,Math.round(goal*52/12));
+      const items=Array.from({length:12},(_,m)=>({
+        label:String(m+1),
+        value:completedBooksBetween(new Date(year,m,1),new Date(year,m+1,0)),
+        target
+      }));
+      return {items,target,targetLabel:`${target}${uxTr("권")}/${uxTr("월")}`};
+    }
+    const years=yearsWithData().map(Number).sort((a,b)=>a-b);
+    const target=goal*52;
+    const items=years.map(y=>({
+      label:String(y),
+      value:completedBooksBetween(new Date(y,0,1),new Date(y,11,31)),
+      target
+    }));
+    return {items,target,targetLabel:`${target}${uxTr("권")}/${uxTr("년")}`};
+  }
+
+  function goalBarsHtml(items){
+    const max=Math.max(1,...items.flatMap(x=>[x.value,x.target]));
+    return items.map(item=>{
+      const valuePct=Math.max(0,Math.min(100,item.value/max*100));
+      const targetPct=Math.max(0,Math.min(100,item.target/max*100));
+      const achieved=item.value>=item.target;
+      return `<div class="goal-viz-col ${achieved?"achieved":""}">
+        <div class="goal-viz-value">${item.value}</div>
+        <div class="goal-viz-track">
+          <div class="goal-viz-fill" style="height:${valuePct}%"></div>
+          <span class="goal-viz-target" style="bottom:${targetPct}%"></span>
+        </div>
+        <div class="goal-viz-label">${escapeHtml(item.label)}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderReadingGoalAnalytics(){
+    const host=document.querySelector("#library .stats-wrap") || document.querySelector(".stats-wrap");
+    if(!host) return;
+    let panel=document.getElementById("readingGoalAnalytics");
+    if(!panel){
+      panel=document.createElement("section");
+      panel.id="readingGoalAnalytics";
+      panel.className="goal-analytics-panel";
+      host.insertAdjacentElement("afterend",panel);
+    }
+    const view=state.readingView;
+    const series=readingGoalSeries(view);
+    const achieved=series.items.filter(x=>x.value>=x.target).length;
+    const avg=series.items.length?Math.round(series.items.reduce((a,b)=>a+b.value,0)/series.items.length*10)/10:0;
+    panel.innerHTML=`
+      <div class="analytics-head">
+        <div>
+          <h3>${uxTr("독서 목표 추이")}</h3>
+          <p>${uxTr("설정한 주간 독서 목표를 주·월·연 단위로 비교해요.")}</p>
+        </div>
+        <div class="segmented-control" role="tablist">
+          <button type="button" data-reading-view="week" class="${view==="week"?"active":""}">${uxTr("주별")}</button>
+          <button type="button" data-reading-view="month" class="${view==="month"?"active":""}">${uxTr("월별")}</button>
+          <button type="button" data-reading-view="year" class="${view==="year"?"active":""}">${uxTr("연도별")}</button>
+        </div>
+      </div>
+      <div class="analytics-kpis">
+        <div><span>${uxTr("목표")}</span><b>${series.targetLabel}</b></div>
+        <div><span>${uxTr("평균")}</span><b>${avg}</b></div>
+        <div><span>${uxTr("달성률")}</span><b>${series.items.length?Math.round(achieved/series.items.length*100):0}%</b></div>
+      </div>
+      <div class="goal-viz-chart" aria-label="${uxTr("독서 목표 추이")}">${goalBarsHtml(series.items)}</div>
+      <div class="goal-viz-legend"><span><i class="goal-viz-legend-fill"></i>${uxTr("실적")}</span><span><i class="goal-viz-legend-target"></i>${uxTr("목표선")}</span></div>`;
+    panel.querySelectorAll("[data-reading-view]").forEach(btn=>btn.onclick=()=>{
+      state.readingView=btn.dataset.readingView;
+      localStorage.setItem("bookaholic-reading-goal-view",state.readingView);
+      renderReadingGoalAnalytics();
+    });
+  }
+
+  function isoWeekNumber(date){
+    const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
+    const day=d.getUTCDay()||7;
+    d.setUTCDate(d.getUTCDate()+4-day);
+    const yearStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    return Math.ceil((((d-yearStart)/86400000)+1)/7);
+  }
+
+  function wakeYears(r){
+    const ys=new Set([new Date().getFullYear()]);
+    (r.entries||[]).forEach(e=>{ if(e.date) ys.add(Number(e.date.slice(0,4))); });
+    return [...ys].filter(Boolean).sort((a,b)=>b-a);
+  }
+
+  function dateRangeForWake(view,year,period){
+    if(view==="year") return [new Date(year,0,1),new Date(year,11,31)];
+    if(view==="quarter"){
+      const q=Math.max(1,Math.min(4,Number(period)||1));
+      return [new Date(year,(q-1)*3,1),new Date(year,q*3,0)];
+    }
+    if(view==="month"){
+      const m=Math.max(1,Math.min(12,Number(period)||1));
+      return [new Date(year,m-1,1),new Date(year,m,0)];
+    }
+    const wanted=Math.max(1,Math.min(53,Number(period)||1));
+    const jan4=new Date(year,0,4);
+    const monday=startOfWeekMonday(jan4);
+    monday.setDate(monday.getDate()+(wanted-1)*7);
+    const end=new Date(monday); end.setDate(end.getDate()+6);
+    return [monday,end];
+  }
+
+  function wakePeriodOptions(view,year){
+    if(view==="quarter"){
+      return [1,2,3,4].map(q=>`<option value="${q}">${q}Q · ${(q-1)*3+1}–${q*3}${uxTr("월")}</option>`).join("");
+    }
+    if(view==="month"){
+      return Array.from({length:12},(_,i)=>`<option value="${i+1}">${i+1}${uxTr("월")}</option>`).join("");
+    }
+    if(view==="week"){
+      return Array.from({length:53},(_,i)=>`<option value="${i+1}">W${i+1}</option>`).join("");
+    }
+    return `<option value="all">${year}</option>`;
+  }
+
+  function wakeSvg(entries,target,start,end){
+    const width=720,height=250,pad={l:54,r:20,t:20,b:34};
+    const values=entries.map(e=>timeToMinutes(e.time)).filter(v=>v!=null);
+    const targetMin=timeToMinutes(target);
+    const basis=[...values, ...(targetMin==null?[]:[targetMin])];
+    if(!basis.length) return `<div class="analytics-empty">${uxTr("기록이 쌓이면 추이가 표시돼요.")}</div>`;
+    let min=Math.min(...basis)-45,max=Math.max(...basis)+45;
+    min=Math.max(180,Math.floor(min/30)*30);
+    max=Math.min(840,Math.ceil(max/30)*30);
+    if(max-min<120){ min=Math.max(180,min-60); max=Math.min(840,max+60); }
+    const span=Math.max(1,end-start);
+    const x=d=>pad.l+((parseD(d)-start)/span)*(width-pad.l-pad.r);
+    const y=v=>pad.t+(max-v)/(max-min)*(height-pad.t-pad.b);
+    const points=entries.map(e=>({e,v:timeToMinutes(e.time)})).filter(o=>o.v!=null)
+      .map(o=>`${x(o.e.date).toFixed(1)},${y(o.v).toFixed(1)}`).join(" ");
+    const ticks=4;
+    let grid="";
+    for(let i=0;i<=ticks;i++){
+      const v=min+(max-min)*(i/ticks), yy=y(v);
+      grid+=`<line x1="${pad.l}" y1="${yy}" x2="${width-pad.r}" y2="${yy}" class="wake-grid-line"></line>
+             <text x="${pad.l-8}" y="${yy+4}" text-anchor="end" class="wake-axis-label">${minutesToTime(v)}</text>`;
+    }
+    const goalLine=targetMin==null?"":`<line x1="${pad.l}" y1="${y(targetMin)}" x2="${width-pad.r}" y2="${y(targetMin)}" class="wake-goal-line"></line>`;
+    const circles=entries.map(o=>({e:o,v:timeToMinutes(o.time)})).filter(o=>o.v!=null).map(o=>
+      `<circle cx="${x(o.e.date)}" cy="${y(o.v)}" r="4" class="wake-point"><title>${o.e.date} · ${o.e.time}</title></circle>`).join("");
+    return `<svg class="wake-trend-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${uxTr("기상시간 추이")}">
+      ${grid}${goalLine}
+      ${points?`<polyline points="${points}" class="wake-line"></polyline>`:""}
+      ${circles}
+      <text x="${pad.l}" y="${height-8}" class="wake-axis-label">${start.getMonth()+1}/${start.getDate()}</text>
+      <text x="${width-pad.r}" y="${height-8}" text-anchor="end" class="wake-axis-label">${end.getMonth()+1}/${end.getDate()}</text>
+    </svg>`;
+  }
+
+  function renderWakeTrend(r){
+    if(r.id!=="wake_early") return;
+    let panel=document.getElementById("wakeTrendPanel");
+    const screen=document.getElementById("routineDetailScreen");
+    if(!screen) return;
+    if(!panel){
+      panel=document.createElement("section");
+      panel.id="wakeTrendPanel";
+      panel.className="reward-card wake-trend-panel";
+      const anchor=document.getElementById("routinePeriodStats")?.closest(".reward-card");
+      if(anchor) anchor.insertAdjacentElement("afterend",panel);
+      else screen.querySelector(".home-wrap")?.appendChild(panel);
+    }
+    const years=wakeYears(r);
+    const currentYear=new Date().getFullYear();
+    if(!state.wakeYear || !years.includes(Number(state.wakeYear))) state.wakeYear=years.includes(currentYear)?currentYear:years[0];
+    if(state.wakePeriod==null){
+      if(state.wakeView==="quarter") state.wakePeriod=Math.floor(new Date().getMonth()/3)+1;
+      else if(state.wakeView==="month") state.wakePeriod=new Date().getMonth()+1;
+      else if(state.wakeView==="week") state.wakePeriod=isoWeekNumber(new Date());
+      else state.wakePeriod="all";
+    }
+    const [start,end]=dateRangeForWake(state.wakeView,Number(state.wakeYear),state.wakePeriod);
+    const entries=(r.entries||[]).filter(e=>e.date&&e.time&&parseD(e.date)>=start&&parseD(e.date)<=end).sort((a,b)=>a.date.localeCompare(b.date));
+    const vals=entries.map(e=>timeToMinutes(e.time)).filter(v=>v!=null);
+    const avg=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null;
+    const target=timeToMinutes(r.goalTime);
+    const success=vals.length&&target!=null?Math.round(vals.filter(v=>v<=target).length/vals.length*100):0;
+    const earliest=vals.length?Math.min(...vals):null;
+
+    panel.innerHTML=`
+      <div class="analytics-head">
+        <div>
+          <h3>🌅 ${uxTr("기상시간 추이")}</h3>
+          <p>${uxTr("기상 기록을 주·월·분기·연도별로 비교해요.")}</p>
+        </div>
+      </div>
+      <div class="wake-controls">
+        <select id="wakeViewSelect">
+          <option value="week">${uxTr("주별")}</option>
+          <option value="month">${uxTr("월별")}</option>
+          <option value="quarter">${uxTr("분기별")}</option>
+          <option value="year">${uxTr("연도별")}</option>
+        </select>
+        <select id="wakeYearSelect">${years.map(y=>`<option value="${y}">${y}</option>`).join("")}</select>
+        <select id="wakePeriodSelect">${wakePeriodOptions(state.wakeView,state.wakeYear)}</select>
+      </div>
+      <div class="analytics-kpis">
+        <div><span>${uxTr("평균 기상")}</span><b>${minutesToTime(avg)}</b></div>
+        <div><span>${uxTr("목표 시간")}</span><b>${r.goalTime||"—"}</b></div>
+        <div><span>${uxTr("성공률")}</span><b>${success}%</b></div>
+        <div><span>${uxTr("가장 이른 기상")}</span><b>${minutesToTime(earliest)}</b></div>
+      </div>
+      <div class="wake-chart-wrap">${wakeSvg(entries,r.goalTime,start,end)}</div>`;
+    panel.querySelector("#wakeViewSelect").value=state.wakeView;
+    panel.querySelector("#wakeYearSelect").value=String(state.wakeYear);
+    const psel=panel.querySelector("#wakePeriodSelect");
+    if([...psel.options].some(o=>String(o.value)===String(state.wakePeriod))) psel.value=String(state.wakePeriod);
+
+    panel.querySelector("#wakeViewSelect").onchange=(e)=>{
+      state.wakeView=e.target.value;
+      localStorage.setItem("bookaholic-wake-view",state.wakeView);
+      state.wakePeriod=null;
+      renderWakeTrend(r);
+    };
+    panel.querySelector("#wakeYearSelect").onchange=(e)=>{state.wakeYear=Number(e.target.value);state.wakePeriod=null;renderWakeTrend(r);};
+    psel.onchange=(e)=>{state.wakePeriod=e.target.value;renderWakeTrend(r);};
+  }
+
+  function insightsData(){
+    const now=new Date(); now.setHours(0,0,0,0);
+    const thisMonthStart=new Date(now.getFullYear(),now.getMonth(),1);
+    const prevMonthStart=new Date(now.getFullYear(),now.getMonth()-1,1);
+    const prevMonthEnd=new Date(now.getFullYear(),now.getMonth(),0);
+    const sumMinutes=(start,end)=>data.books.reduce((sum,b)=>sum+(b.sessions||[]).filter(s=>parseD(s.date)>=start&&parseD(s.date)<=end).reduce((a,s)=>a+(s.minutes||0),0),0);
+    const thisMin=sumMinutes(thisMonthStart,now),prevMin=sumMinutes(prevMonthStart,prevMonthEnd);
+    const delta=prevMin?Math.round((thisMin-prevMin)/prevMin*100):null;
+    const routines=(data.routines||[]).filter(r=>routineGoalConfigured(r));
+    const ranked=routines.map(r=>({r,rate:routineLastNDaysRate(r,30)})).sort((a,b)=>b.rate-a.rate);
+    const top=ranked[0];
+    const weekGoal=Math.max(1,data.weeklyGoal||2);
+    const wk=startOfWeekMonday(now),we=new Date(wk);we.setDate(we.getDate()+6);
+    const wkDone=completedBooksBetween(wk,we);
+    return {thisMin,prevMin,delta,top,weekGoal,wkDone};
+  }
+
+  function renderInsights(){
+    const grid=document.getElementById("mboGrid");
+    if(!grid) return;
+    let panel=document.getElementById("integratedInsights");
+    if(!panel){
+      panel=document.createElement("section");
+      panel.id="integratedInsights";
+      panel.className="insight-panel";
+      grid.insertAdjacentElement("afterend",panel);
+    }
+    const x=insightsData();
+    const deltaText=x.delta==null?uxTr("비교할 지난달 기록 없음"):`${x.delta>=0?"+":""}${x.delta}%`;
+    panel.innerHTML=`
+      <div class="analytics-head">
+        <div><h3>✨ ${uxTr("나의 인사이트")}</h3><p>${uxTr("최근 기록을 짧게 요약해요.")}</p></div>
+      </div>
+      <div class="insight-grid">
+        <div class="insight-card"><span>${uxTr("이번 달 독서")}</span><b>${Math.round(x.thisMin/60*10)/10}${uxTr("시간")}</b><small>${uxTr("지난달 대비")} ${deltaText}</small></div>
+        <div class="insight-card"><span>${uxTr("이번 주 독서 목표")}</span><b>${x.wkDone}/${x.weekGoal}${uxTr("권")}</b><small>${x.wkDone>=x.weekGoal?uxTr("목표 달성") : uxTr("진행 중")}</small></div>
+        <div class="insight-card"><span>${uxTr("가장 꾸준한 목표")}</span><b class="user-content" data-i18n-ignore="true">${x.top?`${escapeHtml(x.top.r.icon)} ${escapeHtml(x.top.r.name)}`:"—"}</b><small>${x.top?`${x.top.rate}% · ${uxTr("최근 30일")}`:uxTr("목표 기록을 시작해 보세요.")}</small></div>
+      </div>`;
+  }
+
+  function appendAdvancedBadges(){
+    const row=document.getElementById("badgeRow");
+    if(!row) return;
+    row.querySelectorAll(".ux-extra-badge").forEach(x=>x.remove());
+    const readingDays=readingDaySet().size;
+    const streak=calcStreak().n;
+    const wake=getRoutine("wake_early");
+    const wakeStreak=wake?routineStreak(wake):0;
+    const extra=[];
+    if(streak>=7) extra.push({icon:"🔥",title:`${streak}${uxTr("일 연속")}`,sub:uxTr("독서 스트릭")});
+    if(readingDays>=30) extra.push({icon:"📚",title:`${readingDays}${uxTr("일")}`,sub:uxTr("누적 독서일")});
+    if(wakeStreak>=7) extra.push({icon:"🌅",title:`${wakeStreak}${uxTr("일 연속")}`,sub:uxTr("기상 목표")});
+    extra.forEach(b=>row.insertAdjacentHTML("beforeend",`<div class="badge on ux-extra-badge"><div class="badge-icon">${b.icon}</div><b>${b.title}</b><span>${b.sub}</span></div>`));
+  }
+
+  const onboardingSteps = () => [
+    {target:"#mboScreen .mbo-title",title:"처음 오셨나요?",body:"이 화면은 독서와 생활 목표를 한곳에서 기록하는 메인 화면입니다. 가이드는 실제 버튼을 하나씩 짚어가며 설명합니다."},
+    {target:"#mboOverviewYearSelect",title:"연도 선택",body:"생활 그리드에서 보고 싶은 연도를 선택합니다. 진한 칸일수록 그날 설정한 목표를 더 많이 달성했다는 뜻입니다."},
+    {target:".mbo-overview-card",title:"생활 그리드",body:"하루의 독서와 목표 달성률을 한눈에 보는 영역입니다. 각 칸에 마우스를 올리거나 터치하면 상세 기록을 확인할 수 있습니다."},
+    {target:"#mboGrid",title:"목표 카드",body:"각 카드는 독서 또는 생활 목표 하나를 의미합니다. 카드를 누르면 오늘 기록, 목표 설정, 전체 추이를 볼 수 있습니다."},
+    {target:'[data-mbo="reading"]',title:"독서",body:"독서 카드는 서재·독서시간·주간 목표·월별/연도별 독서 추이로 이어집니다."},
+    {target:"#openLifeRetroBtn",title:"생활 회고",body:"생활 회고에서는 여러 목표를 한 번에 비교하고 한 해의 흐름을 되돌아볼 수 있습니다."},
+    {target:"#globalLanguageSelect",title:"언어",body:"언어를 바꾸면 고정 UI는 선택한 언어로 다시 렌더링됩니다. 책 제목과 메모처럼 직접 입력한 내용은 원문을 유지합니다."},
+    {target:"#accountDock",title:"계정과 백업",body:"계정 메뉴에서 클라우드 백업, 비밀번호 설정, 로그아웃, 설정, 사용 가이드를 한곳에서 관리할 수 있습니다."},
+    {target:"#saveStateIndicator",title:"자동 저장 상태",body:"저장 중·클라우드 동기화·오프라인 저장 상태를 여기에서 확인할 수 있습니다."}
+  ];
+
+  function ensureOnboardingUi(){
+    if(document.getElementById("uxOnboardingOverlay")) return;
+    const overlay=document.createElement("div");
+    overlay.id="uxOnboardingOverlay";
+    overlay.className="ux-onboarding hidden";
+    overlay.innerHTML=`
+      <div class="ux-tour-card" role="dialog" aria-modal="true">
+        <div class="ux-tour-progress" id="uxTourProgress"></div>
+        <h3 id="uxTourTitle"></h3>
+        <p id="uxTourBody"></p>
+        <div class="ux-tour-actions">
+          <button type="button" class="secondary" id="uxTourSkip">${uxTr("건너뛰기")}</button>
+          <div>
+            <button type="button" class="secondary" id="uxTourPrev">${uxTr("이전")}</button>
+            <button type="button" id="uxTourNext">${uxTr("다음")}</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#uxTourSkip").onclick=endOnboarding;
+    overlay.querySelector("#uxTourPrev").onclick=()=>showOnboardingStep(state.onboardingIndex-1);
+    overlay.querySelector("#uxTourNext").onclick=()=>showOnboardingStep(state.onboardingIndex+1);
+    window.addEventListener("resize",()=>positionTourCard());
+  }
+
+  function clearTourTarget(){
+    document.querySelectorAll(".ux-tour-target").forEach(el=>el.classList.remove("ux-tour-target"));
+  }
+
+  function positionTourCard(){
+    const overlay=document.getElementById("uxOnboardingOverlay");
+    const card=overlay?.querySelector(".ux-tour-card");
+    const target=document.querySelector(".ux-tour-target");
+    if(!overlay || !card || !target) return;
+    const r=target.getBoundingClientRect();
+    const gap=14;
+    const cardW=Math.min(380,window.innerWidth-32);
+    card.style.width=`${cardW}px`;
+    let top=r.bottom+gap;
+    if(top+260>window.innerHeight) top=Math.max(16,r.top-260-gap);
+    let left=Math.min(window.innerWidth-cardW-16,Math.max(16,r.left+r.width/2-cardW/2));
+    card.style.top=`${top}px`;
+    card.style.left=`${left}px`;
+  }
+
+  function showOnboardingStep(index){
+    ensureOnboardingUi();
+    clearTourTarget();
+    const steps=state.onboardingSteps;
+    if(index>=steps.length){ endOnboarding(); return; }
+    if(index<0) index=0;
+    let step=steps[index];
+    let target=document.querySelector(step.target);
+    while((!target || target.offsetParent===null) && index<steps.length-1){
+      index++;
+      step=steps[index];
+      target=document.querySelector(step.target);
+    }
+    if(!target){ endOnboarding(); return; }
+    state.onboardingIndex=index;
+    const overlay=document.getElementById("uxOnboardingOverlay");
+    overlay.classList.remove("hidden");
+    target.classList.add("ux-tour-target");
+    target.scrollIntoView({behavior:getPrefs().reduceMotion?"auto":"smooth",block:"center",inline:"nearest"});
+    overlay.querySelector("#uxTourTitle").textContent=uxTr(step.title);
+    overlay.querySelector("#uxTourBody").textContent=uxTr(step.body);
+    overlay.querySelector("#uxTourProgress").textContent=`${index+1} / ${steps.length}`;
+    overlay.querySelector("#uxTourPrev").disabled=index===0;
+    overlay.querySelector("#uxTourNext").textContent=index===steps.length-1?uxTr("가이드 종료"):uxTr("다음");
+    setTimeout(positionTourCard,getPrefs().reduceMotion?0:280);
+  }
+
+  function startOnboarding(force=false){
+    if(!force && localStorage.getItem(ONBOARDING_KEY)==="done") return;
+    if(document.body.classList.contains("auth-locked")) return;
+    if(typeof applyMbo==="function") applyMbo();
+    state.onboardingSteps=onboardingSteps();
+    state.onboardingIndex=0;
+    setTimeout(()=>showOnboardingStep(0),80);
+  }
+
+  function endOnboarding(){
+    clearTourTarget();
+    document.getElementById("uxOnboardingOverlay")?.classList.add("hidden");
+    localStorage.setItem(ONBOARDING_KEY,"done");
+  }
+
+  function enhanceAccessibility(root=document){
+    root.querySelectorAll?.("button").forEach(btn=>{
+      if(!btn.getAttribute("aria-label") && !btn.textContent.trim()){
+        const title=btn.getAttribute("title");
+        if(title) btn.setAttribute("aria-label",title);
+      }
+    });
+    root.querySelectorAll?.(".op-bar-fill,.week-goal-fill,[class*='bar-fill']").forEach(el=>{
+      if(!el.hasAttribute("role")) el.setAttribute("role","progressbar");
+    });
+    const toast=document.getElementById("globalToast");
+    if(toast){ toast.setAttribute("role","status"); toast.setAttribute("aria-live","polite"); }
+  }
+
+  function ensureSkipLink(){
+    if(document.getElementById("uxSkipLink")) return;
+    const a=document.createElement("a");
+    a.id="uxSkipLink";
+    a.className="ux-skip-link";
+    a.href="#mboScreen";
+    a.textContent=uxTr("본문으로 건너뛰기");
+    document.body.prepend(a);
+  }
+
+  function runBookaholicQA(){
+    const ids=[...document.querySelectorAll("[id]")].map(x=>x.id);
+    const duplicates=[...new Set(ids.filter((id,i)=>ids.indexOf(id)!==i))];
+    const emptyButtons=[...document.querySelectorAll("button")].filter(b=>!b.textContent.trim()&&!b.getAttribute("aria-label"));
+    const overflow=document.documentElement.scrollWidth>document.documentElement.clientWidth+2;
+    const checks=[
+      {check:"중복 ID",pass:duplicates.length===0,detail:duplicates.join(", ")||"0"},
+      {check:"빈 버튼 접근성",pass:emptyButtons.length===0,detail:String(emptyButtons.length)},
+      {check:"가로 화면 넘침",pass:!overflow,detail:overflow?`${document.documentElement.scrollWidth}px`:"없음"},
+      {check:"저장 상태 UI",pass:!!document.getElementById("saveStateIndicator"),detail:""},
+      {check:"계정 메뉴",pass:!!document.getElementById("accountDock"),detail:""},
+      {check:"설정 화면",pass:!!document.getElementById("uxSettingsModal"),detail:""},
+      {check:"다국어 엔진",pass:!!window.I18N,detail:window.I18N?.getLanguage?.()||""}
+    ];
+    if(window.I18N?.getLanguage?.()!=="ko" && typeof window.auditUntranslatedKoreanUI==="function"){
+      const left=window.auditUntranslatedKoreanUI();
+      checks.push({check:"현재 화면 한국어 잔존",pass:left.length===0,detail:String(left.length)});
+    }
+    console.table(checks);
+    return checks;
+  }
+  window.runBookaholicQA=runBookaholicQA;
+
+  function installRuntimeWrappers(){
+    if(window.__bookaholicUxWrapped) return;
+    window.__bookaholicUxWrapped=true;
+
+    if(typeof syncDataToSupabase==="function"){
+      const baseSync=syncDataToSupabase;
+      syncDataToSupabase=async function(...args){
+        if(!navigator.onLine){ setSaveState("offline"); return false; }
+        setSaveState("syncing");
+        const ok=await baseSync(...args);
+        if(ok){
+          try{ localStorage.setItem(CLOUD_SAVE_META_PREFIX+currentStorageKey,String(Date.now())); }catch(_){}
+        }
+        return ok;
+      };
+    }
+
+    if(typeof saveData==="function"){
+      const baseSave=saveData;
+      saveData=async function(opts={}){
+        setSaveState("saving");
+        const ok=await baseSave(opts);
+        if(ok){
+          try{ localStorage.setItem(LOCAL_SAVE_META_PREFIX+currentStorageKey,String(Date.now())); }catch(_){}
+        }
+        if(!ok) setSaveState("error");
+        else if(!navigator.onLine) setSaveState("offline");
+        else setSaveState("saved");
+        return ok;
+      };
+    }
+
+    if(typeof renderStats==="function"){
+      const baseRenderStats=renderStats;
+      renderStats=function(...args){
+        const out=baseRenderStats(...args);
+        requestAnimationFrame(renderReadingGoalAnalytics);
+        return out;
+      };
+    }
+
+    if(typeof renderRoutineDetail==="function"){
+      const baseRenderRoutineDetail=renderRoutineDetail;
+      renderRoutineDetail=function(routineId,...args){
+        const out=baseRenderRoutineDetail(routineId,...args);
+        const r=getRoutine(routineId);
+        requestAnimationFrame(()=>{ if(r?.id==="wake_early") renderWakeTrend(r); else document.getElementById("wakeTrendPanel")?.remove(); });
+        return out;
+      };
+    }
+
+    if(typeof renderMboMain==="function"){
+      const baseRenderMboMain=renderMboMain;
+      renderMboMain=function(...args){
+        const out=baseRenderMboMain(...args);
+        requestAnimationFrame(()=>{ renderInsights(); enhanceAccessibility(document); });
+        return out;
+      };
+    }
+
+    if(typeof renderRewards==="function"){
+      const baseRenderRewards=renderRewards;
+      renderRewards=function(...args){
+        const out=baseRenderRewards(...args);
+        requestAnimationFrame(appendAdvancedBadges);
+        return out;
+      };
+    }
+  }
+
+  function initUxSuite(){
+    applyPrefs();
+    ensureSaveIndicator();
+    ensureSettingsModal();
+    ensureAccountDock();
+    ensureOnboardingUi();
+    ensureSkipLink();
+    installRuntimeWrappers();
+    enhanceAccessibility(document);
+
+    supabaseClient.auth.getSession().then(({data})=>updateAccountDock(data.session));
+    supabaseClient.auth.onAuthStateChange((_event,session)=>updateAccountDock(session));
+
+    window.addEventListener("online",async()=>{
+      setSaveState("syncing");
+      const ok=await syncDataToSupabase();
+      setSaveState(ok?"saved":"error");
+    });
+    window.addEventListener("offline",()=>setSaveState("offline"));
+
+    window.addEventListener("mbo-language-change",()=>{
+      setTimeout(()=>{
+        ensureSettingsModal();
+        renderReadingGoalAnalytics();
+        if(currentRoutineDetailId){
+          const r=getRoutine(currentRoutineDetailId);
+          if(r?.id==="wake_early") renderWakeTrend(r);
+        }
+        renderInsights();
+      },30);
+    });
+
+    const observer=new MutationObserver((mutations)=>{
+      mutations.forEach(m=>m.addedNodes.forEach(n=>{ if(n.nodeType===Node.ELEMENT_NODE) enhanceAccessibility(n); }));
+    });
+    observer.observe(document.body,{childList:true,subtree:true});
+
+    setTimeout(()=>startOnboarding(false),700);
+  }
+
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",initUxSuite,{once:true});
+  else initUxSuite();
+})();
