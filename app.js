@@ -3033,6 +3033,7 @@ document
     wakePeriod: null,
     onboardingIndex: 0,
     onboardingSteps: [],
+    activeGuideKey: null,
     saveTimer: null
   };
 
@@ -3402,7 +3403,7 @@ document
       panel=document.createElement("section");
       panel.id="bridgeRoutineGoalTrendPanel";
       panel.className="goal-analytics-panel routine-goal-trend-panel bridge-trend-panel";
-      const anchor=document.getElementById("bridgeMotivation");
+      const anchor=document.getElementById("bridgeProgressStats");
       if(anchor) anchor.insertAdjacentElement("afterend",panel);
       else screen.querySelector(".home-wrap")?.appendChild(panel);
     }
@@ -3528,7 +3529,7 @@ document
       panel=document.createElement("section");
       panel.id="bridgeWakeTrendPanel";
       panel.className="reward-card wake-trend-panel bridge-trend-panel";
-      const anchor=document.getElementById("bridgeMotivation");
+      const anchor=document.getElementById("bridgeProgressStats");
       if(anchor) anchor.insertAdjacentElement("afterend",panel);
       else screen.querySelector(".home-wrap")?.appendChild(panel);
     }
@@ -3658,6 +3659,244 @@ document
     {target:"#saveStateIndicator",title:"자동 저장 상태",body:"저장 중·클라우드 동기화·오프라인 저장 상태를 여기에서 확인할 수 있습니다."}
   ];
 
+  const CONTEXT_GUIDE_PREFIX = "bookaholic-context-guide-v1:";
+
+  function guideLang(){
+    try { return window.I18N?.getLanguage?.() || "ko"; }
+    catch(_) { return "ko"; }
+  }
+
+  const GUIDE_TEXT = {
+    ko:{
+      replay:"이 화면 가이드",
+      readIntroTitle:"독서 프로젝트 화면",
+      readIntroBody:"현재 독서 프로젝트의 진행 상황을 한눈에 보는 화면입니다. 완독 권수, 읽는 중인 책, 누적 독서시간과 100권 진행도를 함께 확인할 수 있습니다.",
+      readRingTitle:"프로젝트 진행률",
+      readRingBody:"원형 그래프는 현재 100권 구간에서의 진행률입니다. 오른쪽에는 완독 권수, 읽는 중인 책, 총 독서시간이 표시됩니다.",
+      readBaselineTitle:"이전 독서 기록",
+      readBaselineBody:"이 서비스를 쓰기 전에 이미 읽은 책이 있다면 여기에 숫자로 입력할 수 있습니다. 전체 프로젝트 권수에 함께 반영됩니다.",
+      readShelfTitle:"100권 진행 보드",
+      readShelfBody:"작은 칸 100개가 한 구간의 100권을 뜻합니다. 채워진 칸을 통해 현재 위치를 빠르게 확인할 수 있습니다.",
+      readLibraryTitle:"나의 서재",
+      readLibraryBody:"이 버튼으로 책 목록, 연간 독서 그리드, 독서시간과 완독 통계, 목표 추이 화면으로 이동합니다.",
+      readWeeklyTitle:"주간 독서 목표",
+      readWeeklyBody:"이번 주 완독 목표와 실제 달성 상황을 비교하는 영역입니다. 목표 권수는 직접 조정할 수 있습니다.",
+      goalIntroTitle:"이 목표 화면",
+      goalIntroBody:"이 화면은 오늘의 기록을 남기기 전에 목표의 현재 흐름을 확인하는 곳입니다. 최근 달성률과 목표 설정, 추이를 한 화면에서 볼 수 있습니다.",
+      goalStatsTitle:"현재 흐름",
+      goalStatsBody:"연속 달성일, 이번 주 달성 횟수, 최근 30일 달성률을 요약합니다.",
+      goalCardTitle:"나의 목표",
+      goalCardBody:"왜 이 목표를 하는지와 주간 목표 횟수, 시간 기준 같은 현재 설정을 확인하거나 수정할 수 있습니다.",
+      qtTrendTitle:"큐티 목표 추이",
+      qtTrendBody:"큐티 실천 횟수를 주별, 월별, 연도별로 비교합니다. 막대는 실제 기록이고 선은 설정한 목표입니다.",
+      wakeTrendTitle:"기상시간 추이",
+      wakeTrendBody:"실제 기상시간을 주별, 월별, 분기별, 연도별로 비교합니다. 목표시간과 평균, 성공률도 함께 확인할 수 있습니다.",
+      motivationTitle:"오늘의 한마디",
+      motivationBody:"최근 기록과 이번 주 목표 상황을 바탕으로 지금 이어가기 좋은 방향을 짧게 보여줍니다.",
+      todayRecordTitle:"오늘 기록",
+      todayRecordBody:"오늘의 목표 수행 내용을 입력하고 저장하는 곳입니다. 저장하면 메인 화면과 통계에 바로 반영됩니다.",
+      detailTitle:"기록 모아보기",
+      detailBody:"연간 그리드, 월별 평균, 날짜별 전체 기록처럼 더 자세한 기록을 보고 싶을 때 들어가는 화면입니다."
+    },
+    en:{
+      replay:"Guide for this screen",
+      readIntroTitle:"Reading project",
+      readIntroBody:"This page summarizes your reading project: completed books, books in progress, total reading time, and progress toward the current 100-book block.",
+      readRingTitle:"Project progress",
+      readRingBody:"The ring shows progress within the current 100-book block. The figures beside it show completed books, books in progress, and total reading time.",
+      readBaselineTitle:"Earlier reading",
+      readBaselineBody:"If you read books before using this site, enter that number here. It is included in the overall project count.",
+      readShelfTitle:"100-book board",
+      readShelfBody:"These 100 squares represent one 100-book block. Filled squares show your current position at a glance.",
+      readLibraryTitle:"My Library",
+      readLibraryBody:"Open your library to see books, the yearly reading grid, reading-time statistics, completion statistics, and goal trends.",
+      readWeeklyTitle:"Weekly reading goal",
+      readWeeklyBody:"Compare this week's completion goal with your actual result. You can change the weekly target yourself.",
+      goalIntroTitle:"Goal page",
+      goalIntroBody:"This page shows the current flow of this goal before you enter today's record: recent performance, goal settings, and trends.",
+      goalStatsTitle:"Current progress",
+      goalStatsBody:"A summary of your streak, this week's completions, and your success rate over the last 30 days.",
+      goalCardTitle:"My goal",
+      goalCardBody:"Review or edit why this goal matters, its weekly target, and any time-based target.",
+      qtTrendTitle:"Devotional trend",
+      qtTrendBody:"Compare devotional practice by week, month, or year. Bars show actual records and the line shows your target.",
+      wakeTrendTitle:"Wake-up trend",
+      wakeTrendBody:"Compare wake-up times by week, month, quarter, or year, together with your target time, average, and success rate.",
+      motivationTitle:"Today's note",
+      motivationBody:"A short suggestion based on your recent records and this week's target progress.",
+      todayRecordTitle:"Today's record",
+      todayRecordBody:"Enter today's result here. Saving it updates the main dashboard and statistics immediately.",
+      detailTitle:"All records",
+      detailBody:"Open this page when you want the yearly grid, monthly averages, and detailed date-by-date records."
+    },
+    ja:{
+      replay:"この画面のガイド",
+      readIntroTitle:"読書プロジェクト画面",
+      readIntroBody:"完読冊数、読書中の本、累計読書時間、100冊区間の進捗をまとめて確認する画面です。",
+      readRingTitle:"プロジェクト進捗",
+      readRingBody:"円グラフは現在の100冊区間での進捗です。右側に完読、読書中、総読書時間を表示します。",
+      readBaselineTitle:"以前の読書記録",
+      readBaselineBody:"このサービスを使う前に読んだ本があれば冊数を入力できます。全体の冊数に反映されます。",
+      readShelfTitle:"100冊進捗ボード",
+      readShelfBody:"100個のマスが100冊の1区間を表します。塗られたマスで現在位置を確認できます。",
+      readLibraryTitle:"私の本棚",
+      readLibraryBody:"本棚、年間読書グリッド、読書時間、完読統計、目標推移へ移動します。",
+      readWeeklyTitle:"週間読書目標",
+      readWeeklyBody:"今週の完読目標と実績を比較します。目標冊数は変更できます。",
+      goalIntroTitle:"目標画面",
+      goalIntroBody:"今日の記録を入力する前に、最近の達成状況、目標設定、推移を確認する画面です。",
+      goalStatsTitle:"現在の流れ",
+      goalStatsBody:"連続達成日数、今週の達成回数、直近30日の達成率をまとめます。",
+      goalCardTitle:"私の目標",
+      goalCardBody:"目標の理由、週間回数、時間基準などを確認・修正できます。",
+      qtTrendTitle:"デボーション目標推移",
+      qtTrendBody:"週・月・年ごとの実践回数を比較します。棒が実績、線が目標です。",
+      wakeTrendTitle:"起床時間推移",
+      wakeTrendBody:"週・月・四半期・年ごとに起床時間を比較し、目標時刻、平均、達成率も確認できます。",
+      motivationTitle:"今日のひとこと",
+      motivationBody:"最近の記録と今週の目標状況から、続けやすい方向を短く表示します。",
+      todayRecordTitle:"今日の記録",
+      todayRecordBody:"今日の実績を入力して保存します。メイン画面と統計にすぐ反映されます。",
+      detailTitle:"記録をまとめて見る",
+      detailBody:"年間グリッド、月別平均、日付別の詳細記録を見る画面です。"
+    },
+    "zh-CN":{
+      replay:"本页指南",
+      readIntroTitle:"阅读计划页面",
+      readIntroBody:"这里汇总已读完、正在读、累计阅读时间以及当前100本阶段的进度。",
+      readRingTitle:"计划进度",
+      readRingBody:"圆环表示当前100本阶段的进度，右侧显示已读完、正在读和累计阅读时间。",
+      readBaselineTitle:"以前的阅读记录",
+      readBaselineBody:"如果使用本站前已经读过一些书，可以在这里输入数量，并计入总进度。",
+      readShelfTitle:"100本进度板",
+      readShelfBody:"100个小格代表一个100本阶段，填充的小格显示你当前的位置。",
+      readLibraryTitle:"我的书房",
+      readLibraryBody:"进入书房查看书籍、年度阅读网格、阅读时间、完读统计和目标趋势。",
+      readWeeklyTitle:"每周阅读目标",
+      readWeeklyBody:"比较本周完读目标和实际结果，目标本数可以自行调整。",
+      goalIntroTitle:"目标页面",
+      goalIntroBody:"在记录今天之前，这里先展示该目标的近期状态、目标设置和趋势。",
+      goalStatsTitle:"当前进度",
+      goalStatsBody:"汇总连续达成天数、本周完成次数和最近30天达成率。",
+      goalCardTitle:"我的目标",
+      goalCardBody:"查看或修改目标理由、每周次数以及时间标准等设置。",
+      qtTrendTitle:"灵修目标趋势",
+      qtTrendBody:"按周、月、年比较灵修次数。柱状图是实际记录，线条是目标。",
+      wakeTrendTitle:"起床时间趋势",
+      wakeTrendBody:"按周、月、季度、年比较起床时间，并显示目标时间、平均值和成功率。",
+      motivationTitle:"今日提示",
+      motivationBody:"根据近期记录和本周目标进度给出简短提示。",
+      todayRecordTitle:"今日记录",
+      todayRecordBody:"在这里输入并保存今天的结果，主页面和统计会立即更新。",
+      detailTitle:"查看全部记录",
+      detailBody:"查看年度网格、月平均和按日期整理的详细记录。"
+    },
+    "zh-TW":{
+      replay:"本頁指南",
+      readIntroTitle:"閱讀計畫頁面",
+      readIntroBody:"這裡彙整已讀完、閱讀中、累計閱讀時間以及目前100本階段的進度。",
+      readRingTitle:"計畫進度",
+      readRingBody:"圓環表示目前100本階段的進度，右側顯示已讀完、閱讀中與累計閱讀時間。",
+      readBaselineTitle:"以前的閱讀記錄",
+      readBaselineBody:"如果使用本站前已讀過一些書，可以在這裡輸入數量並計入總進度。",
+      readShelfTitle:"100本進度板",
+      readShelfBody:"100個小格代表一個100本階段，填滿的小格顯示目前位置。",
+      readLibraryTitle:"我的書房",
+      readLibraryBody:"進入書房查看書籍、年度閱讀網格、閱讀時間、完讀統計與目標趨勢。",
+      readWeeklyTitle:"每週閱讀目標",
+      readWeeklyBody:"比較本週完讀目標與實際結果，目標本數可以自行調整。",
+      goalIntroTitle:"目標頁面",
+      goalIntroBody:"在記錄今天之前，這裡先呈現此目標的近期狀態、目標設定與趨勢。",
+      goalStatsTitle:"目前進度",
+      goalStatsBody:"彙整連續達成天數、本週完成次數與最近30天達成率。",
+      goalCardTitle:"我的目標",
+      goalCardBody:"查看或修改目標理由、每週次數與時間標準等設定。",
+      qtTrendTitle:"靈修目標趨勢",
+      qtTrendBody:"按週、月、年比較靈修次數。柱狀圖是實際記錄，線條是目標。",
+      wakeTrendTitle:"起床時間趨勢",
+      wakeTrendBody:"按週、月、季、年比較起床時間，並顯示目標時間、平均值與成功率。",
+      motivationTitle:"今日提示",
+      motivationBody:"依近期記錄與本週目標進度顯示簡短提示。",
+      todayRecordTitle:"今日記錄",
+      todayRecordBody:"在這裡輸入並儲存今天的結果，主頁與統計會立即更新。",
+      detailTitle:"查看全部記錄",
+      detailBody:"查看年度網格、月平均與按日期整理的詳細記錄。"
+    }
+  };
+
+  function guideT(key){
+    const lang=guideLang();
+    const pack=GUIDE_TEXT[lang] || GUIDE_TEXT.en;
+    return pack[key] || GUIDE_TEXT.en[key] || key;
+  }
+
+  function readingGuideSteps(){
+    return [
+      {target:"#homeScreen .home-hero",title:guideT("readIntroTitle"),body:guideT("readIntroBody"),raw:true},
+      {target:"#homeScreen .home-ring-row",title:guideT("readRingTitle"),body:guideT("readRingBody"),raw:true},
+      {target:"#homeScreen .home-baseline",title:guideT("readBaselineTitle"),body:guideT("readBaselineBody"),raw:true},
+      {target:"#homeScreen .home-shelf",title:guideT("readShelfTitle"),body:guideT("readShelfBody"),raw:true},
+      {target:"#enterLibraryBtn",title:guideT("readLibraryTitle"),body:guideT("readLibraryBody"),raw:true},
+      {target:"#homeScreen .reward-section .reward-card:first-child",title:guideT("readWeeklyTitle"),body:guideT("readWeeklyBody"),raw:true}
+    ];
+  }
+
+  function routineGuideSteps(r){
+    const steps=[
+      {target:"#bridgeTitle",title:guideT("goalIntroTitle"),body:guideT("goalIntroBody"),raw:true},
+      {target:"#bridgeProgressStats",title:guideT("goalStatsTitle"),body:guideT("goalStatsBody"),raw:true},
+      {target:"#bridgeGoalCard",title:guideT("goalCardTitle"),body:guideT("goalCardBody"),raw:true}
+    ];
+    if(r?.id==="qt"){
+      steps.push({target:"#bridgeRoutineGoalTrendPanel",title:guideT("qtTrendTitle"),body:guideT("qtTrendBody"),raw:true});
+    }
+    if(r?.id==="wake_early"){
+      steps.push({target:"#bridgeWakeTrendPanel",title:guideT("wakeTrendTitle"),body:guideT("wakeTrendBody"),raw:true});
+    }
+    steps.push(
+      {target:"#bridgeMotivation",title:guideT("motivationTitle"),body:guideT("motivationBody"),raw:true},
+      {target:"#bridgeWidgetCard",title:guideT("todayRecordTitle"),body:guideT("todayRecordBody"),raw:true},
+      {target:"#goRoutineDetailBtn",title:guideT("detailTitle"),body:guideT("detailBody"),raw:true}
+    );
+    return steps;
+  }
+
+  function startGuide(steps,key,force=false){
+    if(!force && localStorage.getItem(key)==="done") return;
+    if(document.body.classList.contains("auth-locked")) return;
+    ensureOnboardingUi();
+    state.activeGuideKey=key;
+    state.onboardingSteps=steps;
+    state.onboardingIndex=0;
+    setTimeout(()=>showOnboardingStep(0),100);
+  }
+
+  function startReadingGuide(force=false){
+    startGuide(readingGuideSteps(),`${CONTEXT_GUIDE_PREFIX}reading`,force);
+  }
+
+  function startRoutineGuide(r,force=false){
+    if(!r) return;
+    startGuide(routineGuideSteps(r),`${CONTEXT_GUIDE_PREFIX}${r.id}`,force);
+  }
+
+  function ensureContextGuideButton(screenId,onClick){
+    const screen=document.getElementById(screenId);
+    const wrap=screen?.querySelector(".home-wrap");
+    if(!wrap) return;
+    let btn=wrap.querySelector(".context-guide-btn");
+    if(!btn){
+      btn=document.createElement("button");
+      btn.type="button";
+      btn.className="context-guide-btn";
+      btn.innerHTML=`<span aria-hidden="true">?</span><span>${guideT("replay")}</span>`;
+      wrap.appendChild(btn);
+    }else{
+      btn.innerHTML=`<span aria-hidden="true">?</span><span>${guideT("replay")}</span>`;
+    }
+    btn.onclick=onClick;
+  }
+
   function ensureOnboardingUi(){
     if(document.getElementById("uxOnboardingOverlay")) return;
     const overlay=document.createElement("div");
@@ -3723,8 +3962,8 @@ document
     overlay.classList.remove("hidden");
     target.classList.add("ux-tour-target");
     target.scrollIntoView({behavior:getPrefs().reduceMotion?"auto":"smooth",block:"center",inline:"nearest"});
-    overlay.querySelector("#uxTourTitle").textContent=uxTr(step.title);
-    overlay.querySelector("#uxTourBody").textContent=uxTr(step.body);
+    overlay.querySelector("#uxTourTitle").textContent=step.raw?String(step.title):uxTr(step.title);
+    overlay.querySelector("#uxTourBody").textContent=step.raw?String(step.body):uxTr(step.body);
     overlay.querySelector("#uxTourProgress").textContent=`${index+1} / ${steps.length}`;
     overlay.querySelector("#uxTourPrev").disabled=index===0;
     overlay.querySelector("#uxTourNext").textContent=index===steps.length-1?uxTr("가이드 종료"):uxTr("다음");
@@ -3735,6 +3974,7 @@ document
     if(!force && localStorage.getItem(ONBOARDING_KEY)==="done") return;
     if(document.body.classList.contains("auth-locked")) return;
     if(typeof applyMbo==="function") applyMbo();
+    state.activeGuideKey=ONBOARDING_KEY;
     state.onboardingSteps=onboardingSteps();
     state.onboardingIndex=0;
     setTimeout(()=>showOnboardingStep(0),80);
@@ -3743,7 +3983,8 @@ document
   function endOnboarding(){
     clearTourTarget();
     document.getElementById("uxOnboardingOverlay")?.classList.add("hidden");
-    localStorage.setItem(ONBOARDING_KEY,"done");
+    if(state.activeGuideKey) localStorage.setItem(state.activeGuideKey,"done");
+    state.activeGuideKey=null;
   }
 
   function enhanceAccessibility(root=document){
@@ -3834,6 +4075,24 @@ document
       };
     }
 
+    if(typeof renderHome==="function"){
+      const baseRenderHome=renderHome;
+      renderHome=function(...args){
+        const out=baseRenderHome(...args);
+        requestAnimationFrame(()=>{
+          const svg=document.querySelector("#homeScreen .home-ring svg");
+          if(svg){
+            svg.setAttribute("viewBox","0 0 180 180");
+            svg.setAttribute("preserveAspectRatio","xMidYMid meet");
+          }
+          ensureContextGuideButton("homeScreen",()=>startReadingGuide(true));
+          setTimeout(()=>startReadingGuide(false),180);
+          enhanceAccessibility(document);
+        });
+        return out;
+      };
+    }
+
     if(typeof renderBridge==="function"){
       const baseRenderBridge=renderBridge;
       renderBridge=function(routineId,...args){
@@ -3846,6 +4105,8 @@ document
           if(r?.id==="wake_early") renderWakeTrend(r);
           if(r?.id==="qt") renderRoutineGoalTrend(r);
 
+          ensureContextGuideButton("bridgeScreen",()=>startRoutineGuide(r,true));
+          setTimeout(()=>startRoutineGuide(r,false),220);
           enhanceAccessibility(document);
         });
         return out;
