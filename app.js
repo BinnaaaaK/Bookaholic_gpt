@@ -3028,6 +3028,7 @@ document
   const state = {
     readingView: localStorage.getItem("bookaholic-reading-goal-view") || "week",
     wakeView: localStorage.getItem("bookaholic-wake-view") || "month",
+    qtView: localStorage.getItem("bookaholic-qt-goal-view") || "week",
     wakeYear: null,
     wakePeriod: null,
     onboardingIndex: 0,
@@ -3351,6 +3352,93 @@ document
     });
   }
 
+  function routineGoalSeries(r, view){
+    const goal=Math.max(1,ensureRoutineGoalShape(r).weeklyTarget||1);
+    const now=new Date(); now.setHours(0,0,0,0);
+
+    if(view==="week"){
+      const items=[];
+      const base=startOfWeekMonday(now);
+      for(let offset=7;offset>=0;offset--){
+        const start=new Date(base); start.setDate(start.getDate()-offset*7);
+        const end=new Date(start); end.setDate(end.getDate()+6);
+        items.push({
+          label:`${start.getMonth()+1}/${start.getDate()}`,
+          value:routineSuccessCountBetween(r,start,end),
+          target:goal
+        });
+      }
+      return {items,target:goal,targetLabel:`${goal}${uxTr("회")}/${uxTr("주")}`};
+    }
+
+    if(view==="month"){
+      const year=now.getFullYear();
+      const target=Math.max(1,Math.round(goal*52/12));
+      const items=Array.from({length:12},(_,m)=>({
+        label:String(m+1),
+        value:routineSuccessCountBetween(r,new Date(year,m,1),new Date(year,m+1,0)),
+        target
+      }));
+      return {items,target,targetLabel:`${target}${uxTr("회")}/${uxTr("월")}`};
+    }
+
+    const years=routineYearsWithData(r).slice().sort((a,b)=>a-b);
+    const target=goal*52;
+    const items=years.map(y=>({
+      label:String(y),
+      value:routineSuccessCountBetween(r,new Date(y,0,1),new Date(y,11,31)),
+      target
+    }));
+    return {items,target,targetLabel:`${target}${uxTr("회")}/${uxTr("년")}`};
+  }
+
+  function renderRoutineGoalTrend(r){
+    if(r.id!=="qt") return;
+    let panel=document.getElementById("routineGoalTrendPanel");
+    const screen=document.getElementById("routineDetailScreen");
+    if(!screen) return;
+
+    if(!panel){
+      panel=document.createElement("section");
+      panel.id="routineGoalTrendPanel";
+      panel.className="goal-analytics-panel routine-goal-trend-panel";
+      const anchor=document.getElementById("routinePeriodStats")?.closest(".reward-card");
+      if(anchor) anchor.insertAdjacentElement("afterend",panel);
+      else screen.querySelector(".home-wrap")?.appendChild(panel);
+    }
+
+    const view=state.qtView||"week";
+    const series=routineGoalSeries(r,view);
+    const achieved=series.items.filter(x=>x.value>=x.target).length;
+    const avg=series.items.length?Math.round(series.items.reduce((a,b)=>a+b.value,0)/series.items.length*10)/10:0;
+
+    panel.innerHTML=`
+      <div class="analytics-head">
+        <div>
+          <h3>🙏 ${uxTr("큐티")} · ${uxTr("목표")}</h3>
+          <p>${uxTr("주별")} · ${uxTr("월별")} · ${uxTr("연도별")}</p>
+        </div>
+        <div class="segmented-control" role="tablist">
+          <button type="button" data-qt-view="week" class="${view==="week"?"active":""}">${uxTr("주별")}</button>
+          <button type="button" data-qt-view="month" class="${view==="month"?"active":""}">${uxTr("월별")}</button>
+          <button type="button" data-qt-view="year" class="${view==="year"?"active":""}">${uxTr("연도별")}</button>
+        </div>
+      </div>
+      <div class="analytics-kpis">
+        <div><span>${uxTr("목표")}</span><b>${series.targetLabel}</b></div>
+        <div><span>${uxTr("평균")}</span><b>${avg}</b></div>
+        <div><span>${uxTr("달성률")}</span><b>${series.items.length?Math.round(achieved/series.items.length*100):0}%</b></div>
+      </div>
+      <div class="goal-viz-chart" aria-label="${uxTr("큐티")}">${goalBarsHtml(series.items)}</div>
+      <div class="goal-viz-legend"><span><i class="goal-viz-legend-fill"></i>${uxTr("실적")}</span><span><i class="goal-viz-legend-target"></i>${uxTr("목표선")}</span></div>`;
+
+    panel.querySelectorAll("[data-qt-view]").forEach(btn=>btn.onclick=()=>{
+      state.qtView=btn.dataset.qtView;
+      localStorage.setItem("bookaholic-qt-goal-view",state.qtView);
+      renderRoutineGoalTrend(r);
+    });
+  }
+
   function isoWeekNumber(date){
     const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
     const day=d.getUTCDay()||7;
@@ -3604,8 +3692,9 @@ document
     const gap=14;
     const cardW=Math.min(380,window.innerWidth-32);
     card.style.width=`${cardW}px`;
+    const cardH=Math.min(card.offsetHeight || 260, window.innerHeight-32);
     let top=r.bottom+gap;
-    if(top+260>window.innerHeight) top=Math.max(16,r.top-260-gap);
+    if(top+cardH>window.innerHeight-16) top=Math.max(16,r.top-cardH-gap);
     let left=Math.min(window.innerWidth-cardW-16,Math.max(16,r.left+r.width/2-cardW/2));
     card.style.top=`${top}px`;
     card.style.left=`${left}px`;
@@ -3746,7 +3835,13 @@ document
       renderRoutineDetail=function(routineId,...args){
         const out=baseRenderRoutineDetail(routineId,...args);
         const r=getRoutine(routineId);
-        requestAnimationFrame(()=>{ if(r?.id==="wake_early") renderWakeTrend(r); else document.getElementById("wakeTrendPanel")?.remove(); });
+        requestAnimationFrame(()=>{
+          if(r?.id==="wake_early") renderWakeTrend(r);
+          else document.getElementById("wakeTrendPanel")?.remove();
+
+          if(r?.id==="qt") renderRoutineGoalTrend(r);
+          else document.getElementById("routineGoalTrendPanel")?.remove();
+        });
         return out;
       };
     }
@@ -3797,6 +3892,7 @@ document
         if(currentRoutineDetailId){
           const r=getRoutine(currentRoutineDetailId);
           if(r?.id==="wake_early") renderWakeTrend(r);
+          if(r?.id==="qt") renderRoutineGoalTrend(r);
         }
         renderInsights();
       },30);
