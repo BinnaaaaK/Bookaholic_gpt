@@ -2378,3 +2378,361 @@ body.ux-reduce-motion *::after{
     max-height:56vh !important;
   }
 }
+
+
+/* ==========================================================================
+   Bookaholic UX Refinement 2026-10-24 / v023
+   Final layout normalization
+   - consistent pre-detail page width
+   - restored/scalable reading-project ring
+   - same annual-grid density on MBO and Library
+   - per-goal replay guide button
+   ========================================================================== */
+
+:root{
+  --bookaholic-shell:720px;
+  --bookaholic-library:760px;
+}
+
+/* Shared visual width: main, reading project and routine goal pages. */
+#mboScreen .mbo-wrap,
+#homeScreen .home-wrap,
+#bridgeScreen .home-wrap{
+  width:100% !important;
+  max-width:var(--bookaholic-shell) !important;
+  margin-left:auto !important;
+  margin-right:auto !important;
+}
+
+#library{
+  width:100% !important;
+  max-width:var(--bookaholic-library) !important;
+  margin-left:auto !important;
+  margin-right:auto !important;
+  padding-left:20px !important;
+  padding-right:20px !important;
+}
+
+/* Keep pre-detail pages visually similar on a large monitor. */
+#homeScreen{
+  align-items:flex-start !important;
+  justify-content:center !important;
+  padding:38px 20px 72px !important;
+}
+#homeScreen .home-wrap,
+#bridgeScreen .home-wrap{
+  position:relative;
+}
+#homeScreen .home-hero,
+#homeScreen .home-ring-row,
+#homeScreen .home-baseline,
+#homeScreen .home-shelf,
+#homeScreen .home-cta,
+#homeScreen .reward-section{
+  width:100%;
+  max-width:620px;
+  margin-left:auto;
+  margin-right:auto;
+}
+#homeScreen .home-hero{
+  margin-bottom:0;
+}
+#homeScreen .home-hero h1{
+  font-size:clamp(30px,3vw,36px) !important;
+}
+#homeScreen .home-sub{
+  margin-bottom:22px !important;
+}
+
+/* Reading project ring: SVG now receives a viewBox in app.js, so it scales cleanly. */
+#homeScreen .home-ring-row{
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:38px !important;
+  margin-bottom:22px !important;
+}
+#homeScreen .home-ring{
+  width:168px !important;
+  height:168px !important;
+  flex:0 0 168px !important;
+  overflow:visible !important;
+}
+#homeScreen .home-ring svg{
+  display:block !important;
+  width:168px !important;
+  height:168px !important;
+  overflow:visible !important;
+}
+#homeScreen .home-ring-pct{
+  font-size:26px !important;
+}
+#homeScreen .home-stats{
+  min-width:150px;
+  gap:12px !important;
+}
+#homeScreen .hs-num{
+  font-size:20px;
+}
+
+/* Compact 100-book board without making the page look stretched. */
+#homeScreen .home-baseline{
+  margin-bottom:18px !important;
+}
+#homeScreen .home-shelf{
+  max-width:500px !important;
+  grid-template-columns:repeat(20,minmax(0,1fr)) !important;
+  gap:3px !important;
+  margin-bottom:24px !important;
+}
+#homeScreen .shelf-mark{
+  width:auto !important;
+  min-width:0 !important;
+}
+#homeScreen .home-cta{
+  display:block;
+}
+#homeScreen .reward-section{
+  margin-top:22px !important;
+}
+
+/* Routine bridge pages use the same content density as the reading project page. */
+#bridgeScreen .home-wrap{
+  padding:38px 20px 68px !important;
+}
+#bridgeScreen .bridge-progress-grid,
+#bridgeScreen .goal-card,
+#bridgeScreen .goal-setup-card,
+#bridgeScreen .motivation-card,
+#bridgeScreen .mini-heatmap-wrap,
+#bridgeScreen .reward-card,
+#bridgeScreen .bridge-trend-panel,
+#bridgeScreen #goRoutineDetailBtn{
+  width:100%;
+  max-width:660px;
+  margin-left:auto !important;
+  margin-right:auto !important;
+}
+#bridgeScreen .bridge-progress-grid{
+  margin-bottom:12px !important;
+}
+#bridgeScreen .bridge-trend-panel{
+  margin-top:0 !important;
+  margin-bottom:14px !important;
+}
+
+/* Small replay button for the guide of the current goal/page. */
+.context-guide-btn{
+  position:absolute;
+  top:0;
+  right:0;
+  z-index:20;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:34px;
+  padding:7px 10px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--paper-dim);
+  color:var(--ink-soft);
+  font-size:11px;
+  font-family:"Avenir Next","Segoe UI","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  box-shadow:var(--shadow-sm);
+}
+.context-guide-btn:hover{
+  color:var(--ink);
+  border-color:var(--line-strong);
+  opacity:1;
+}
+.context-guide-btn>span:first-child{
+  display:grid;
+  place-items:center;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:var(--blue-bg);
+  color:var(--blue);
+  font-weight:800;
+}
+
+/* Annual grids: MBO and Library deliberately use the SAME desktop geometry. */
+.mbo-overview-card,
+.contrib-wrap{
+  --annual-cell:10px;
+  --annual-gap:2px;
+}
+.mbo-overview-card .mbo-contrib-scroll,
+.contrib-wrap .contrib-scroll{
+  overflow-x:auto !important;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:4px !important;
+}
+.mbo-overview-card .contrib-inner,
+.contrib-wrap .contrib-inner{
+  display:block !important;
+  width:max-content !important;
+  min-width:0 !important;
+  max-width:none !important;
+  margin-left:auto !important;
+  margin-right:auto !important;
+}
+.mbo-overview-card .contrib-months,
+.contrib-wrap .contrib-months{
+  grid-auto-columns:var(--annual-cell) !important;
+  gap:var(--annual-gap) !important;
+  margin-left:20px !important;
+  height:16px !important;
+  font-size:9px !important;
+}
+.mbo-overview-card .contrib-days,
+.contrib-wrap .contrib-days{
+  grid-template-rows:repeat(7,var(--annual-cell)) !important;
+  gap:var(--annual-gap) !important;
+  width:14px !important;
+  line-height:var(--annual-cell) !important;
+  font-size:8px !important;
+}
+.mbo-overview-card .contrib-grid,
+.contrib-wrap .contrib-grid{
+  grid-template-rows:repeat(7,var(--annual-cell)) !important;
+  grid-auto-columns:var(--annual-cell) !important;
+  gap:var(--annual-gap) !important;
+}
+.mbo-overview-card .contrib-grid .heatmap-cell,
+.contrib-wrap .contrib-grid .heatmap-cell{
+  width:var(--annual-cell) !important;
+  height:var(--annual-cell) !important;
+  border-radius:2px !important;
+}
+
+/* Make the card itself visually balanced around the common grid. */
+.mbo-overview-card,
+.contrib-wrap{
+  padding:17px 18px !important;
+}
+.mbo-overview-card .heatmap-legend{
+  justify-content:center !important;
+}
+.contrib-wrap .heatmap-legend{
+  justify-content:flex-end !important;
+}
+
+/* Keep the trend cards close to the top of QT / wake goal pages. */
+#bridgeScreen #bridgeRoutineGoalTrendPanel,
+#bridgeScreen #bridgeWakeTrendPanel{
+  order:initial;
+}
+#bridgeScreen .bridge-trend-panel .goal-viz-chart{
+  height:145px !important;
+}
+#bridgeScreen .bridge-trend-panel .wake-trend-svg{
+  max-height:190px !important;
+}
+
+/* Tour card remains above both spotlight target and all app chrome. */
+.ux-onboarding{
+  z-index:30000 !important;
+}
+.ux-tour-target{
+  z-index:29000 !important;
+}
+.ux-tour-card{
+  z-index:30010 !important;
+}
+
+/* Tablet/mobile: keep all pages compact but readable, and fit annual grids. */
+@media (max-width:760px){
+  :root{
+    --bookaholic-shell:100%;
+    --bookaholic-library:100%;
+  }
+  #mboScreen .mbo-wrap,
+  #homeScreen .home-wrap,
+  #bridgeScreen .home-wrap,
+  #library{
+    max-width:none !important;
+  }
+  #homeScreen{
+    padding:26px 14px 72px !important;
+  }
+  #bridgeScreen .home-wrap{
+    padding:30px 14px 72px !important;
+  }
+  #homeScreen .home-hero,
+  #homeScreen .home-ring-row,
+  #homeScreen .home-baseline,
+  #homeScreen .home-shelf,
+  #homeScreen .home-cta,
+  #homeScreen .reward-section,
+  #bridgeScreen .bridge-progress-grid,
+  #bridgeScreen .goal-card,
+  #bridgeScreen .goal-setup-card,
+  #bridgeScreen .motivation-card,
+  #bridgeScreen .mini-heatmap-wrap,
+  #bridgeScreen .reward-card,
+  #bridgeScreen .bridge-trend-panel,
+  #bridgeScreen #goRoutineDetailBtn{
+    max-width:none;
+  }
+  .mbo-overview-card,
+  .contrib-wrap{
+    --annual-cell:7px;
+    --annual-gap:1px;
+  }
+  .mbo-overview-card .contrib-months,
+  .contrib-wrap .contrib-months{
+    margin-left:15px !important;
+    font-size:7px !important;
+    height:13px !important;
+  }
+  .mbo-overview-card .contrib-days,
+  .contrib-wrap .contrib-days{
+    width:10px !important;
+    font-size:7px !important;
+  }
+}
+
+@media (max-width:520px){
+  #homeScreen .home-ring-row{
+    flex-wrap:wrap !important;
+    gap:18px !important;
+  }
+  #homeScreen .home-ring{
+    width:148px !important;
+    height:148px !important;
+    flex-basis:148px !important;
+  }
+  #homeScreen .home-ring svg{
+    width:148px !important;
+    height:148px !important;
+  }
+  #homeScreen .home-stats{
+    min-width:140px;
+  }
+  #homeScreen .home-shelf{
+    gap:2px !important;
+  }
+  .context-guide-btn{
+    top:-4px;
+  }
+  .context-guide-btn>span:last-child{
+    display:none;
+  }
+  .mbo-overview-card,
+  .contrib-wrap{
+    --annual-cell:5px;
+    --annual-gap:1px;
+  }
+  .mbo-overview-card .contrib-months,
+  .contrib-wrap .contrib-months{
+    margin-left:12px !important;
+    font-size:6px !important;
+  }
+  .mbo-overview-card .contrib-days,
+  .contrib-wrap .contrib-days{
+    width:8px !important;
+    font-size:6px !important;
+  }
+}
