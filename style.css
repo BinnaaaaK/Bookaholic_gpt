@@ -1880,3 +1880,158 @@ body.ux-reduce-motion *::after{
     scroll-behavior:auto !important;
   }
 }
+
+
+/* ==========================================================================
+   Bookaholic UX Refinement 2026-10-24
+   - clearer onboarding bubble
+   - account/language separation
+   - responsive life/library heatmaps
+   - refreshed goal chart palette
+   - QT goal trend panel
+   ========================================================================== */
+
+/* Desktop: keep language and account controls on separate rows. */
+@media (min-width:701px){
+  .account-dock{
+    top:calc(max(14px, env(safe-area-inset-top)) + 52px);
+  }
+  .global-language-picker{ z-index:9500; }
+}
+
+/* Stronger, clearer onboarding speech card. */
+.ux-tour-card{
+  background:rgba(24,31,40,.985) !important;
+  border:1px solid rgba(151,181,220,.35) !important;
+  border-radius:15px !important;
+  padding:18px !important;
+  color:#f7f9fc !important;
+  box-shadow:0 24px 70px rgba(0,0,0,.64) !important;
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  opacity:1 !important;
+  filter:none !important;
+}
+.ux-tour-progress{
+  color:#8acbff !important;
+  font-size:11px !important;
+  letter-spacing:.02em;
+  margin-bottom:9px !important;
+}
+.ux-tour-card h3{
+  color:#ffffff !important;
+  font-size:20px !important;
+  line-height:1.35;
+  margin:0 0 9px !important;
+}
+.ux-tour-card p{
+  color:rgba(247,249,252,.94) !important;
+  font-size:13.5px !important;
+  line-height:1.72 !important;
+  margin:0 !important;
+}
+.ux-tour-card .secondary{
+  color:#e8edf4;
+  border-color:rgba(255,255,255,.16);
+}
+
+/* Responsive yearly grids: use available card width instead of fixed tiny cells. */
+.contrib-wrap,
+.mbo-overview-card,
+.routine-year-card{
+  container-type:inline-size;
+}
+.contrib-wrap{
+  --fit-grid-cell:clamp(4px, calc((100cqw - 150px)/53), 11px);
+  --fit-grid-gap:clamp(1px, .22cqw, 3px);
+}
+.contrib-wrap .contrib-scroll{
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.contrib-wrap .contrib-inner{
+  min-width:0;
+  width:max-content;
+  max-width:100%;
+  margin-left:auto;
+  margin-right:auto;
+}
+.contrib-wrap .contrib-months{
+  grid-auto-columns:var(--fit-grid-cell);
+  gap:var(--fit-grid-gap);
+  margin-left:calc(var(--fit-grid-cell) + 12px);
+}
+.contrib-wrap .contrib-days{
+  grid-template-rows:repeat(7,var(--fit-grid-cell));
+  gap:var(--fit-grid-gap);
+  line-height:var(--fit-grid-cell);
+}
+.contrib-wrap .contrib-grid{
+  grid-template-rows:repeat(7,var(--fit-grid-cell));
+  grid-auto-columns:var(--fit-grid-cell);
+  gap:var(--fit-grid-gap);
+}
+.contrib-wrap .contrib-grid .heatmap-cell{
+  width:var(--fit-grid-cell);
+  height:var(--fit-grid-cell);
+}
+
+.mbo-overview-card,
+.routine-year-card{
+  --mbo-grid-cell:clamp(4px, calc((100cqw - 135px)/53), 10px);
+  --mbo-grid-gap:clamp(1px, .2cqw, 2px);
+}
+.mbo-overview-card .mbo-contrib-scroll,
+.routine-year-card .routine-contrib-scroll,
+#lifeRetroScreen .contrib-scroll{
+  overflow-x:auto !important;
+  -webkit-overflow-scrolling:touch;
+}
+.mbo-overview-card .contrib-inner,
+.routine-year-card .contrib-inner,
+#lifeRetroScreen .life-retro-heatmap{
+  width:max-content;
+  max-width:100%;
+  margin-left:auto;
+  margin-right:auto;
+}
+
+/* Reading/QT goal chart palette: soft green actuals, blue achieved, gold target. */
+.goal-viz-track{
+  background:rgba(11,16,22,.74);
+  border-color:rgba(162,180,199,.22);
+}
+.goal-viz-fill{
+  background:linear-gradient(180deg,#8fc9ad 0%,#5d9f81 100%) !important;
+}
+.goal-viz-col.achieved .goal-viz-fill{
+  background:linear-gradient(180deg,#9bd0ff 0%,#679fe0 100%) !important;
+}
+.goal-viz-target{
+  background:#f2c766 !important;
+  box-shadow:0 0 0 1px rgba(0,0,0,.16),0 0 8px rgba(242,199,102,.18);
+}
+.goal-viz-legend-fill{ background:#72b291 !important; }
+.goal-viz-legend-target{ background:#f2c766 !important; }
+.routine-goal-trend-panel{ margin-top:0; }
+
+@media (max-width:900px){
+  .mbo-year-summary,
+  .mbo-all-year-stats{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media (max-width:560px){
+  .ux-tour-card{
+    width:calc(100vw - 28px) !important;
+    max-height:min(50vh,430px) !important;
+    overflow:auto;
+  }
+  .mbo-year-summary,
+  .mbo-all-year-stats{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .contrib-wrap{ --fit-grid-cell:clamp(4px, calc((100cqw - 112px)/53), 8px); }
+  .mbo-overview-card,
+  .routine-year-card{ --mbo-grid-cell:clamp(4px, calc((100cqw - 104px)/53), 8px); }
+}
