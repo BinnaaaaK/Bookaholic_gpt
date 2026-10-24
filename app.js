@@ -3696,7 +3696,35 @@ document
       todayRecordTitle:"오늘 기록",
       todayRecordBody:"오늘의 목표 수행 내용을 입력하고 저장하는 곳입니다. 저장하면 메인 화면과 통계에 바로 반영됩니다.",
       detailTitle:"기록 모아보기",
-      detailBody:"연간 그리드, 월별 평균, 날짜별 전체 기록처럼 더 자세한 기록을 보고 싶을 때 들어가는 화면입니다."
+      detailBody:"연간 그리드, 월별 평균, 날짜별 전체 기록처럼 더 자세한 기록을 보고 싶을 때 들어가는 화면입니다.",
+      libraryIntroTitle:"나의 서재",
+      libraryIntroBody:"책 목록과 독서 통계를 한곳에서 관리하는 화면입니다. 위에서부터 연간 독서 그리드, 통계, 목표 추이, 검색·정렬, 책 목록 순서로 살펴봅니다.",
+      libraryGridTitle:"연간 독서 그리드",
+      libraryGridBody:"타이머로 독서한 날짜와 시간을 연간 단위로 보여줍니다. 색이 진할수록 그날 더 오래 읽었다는 뜻입니다.",
+      libraryStatsTitle:"독서 통계",
+      libraryStatsBody:"주간 독서시간, 월별 완독 권수, 연도별 완독, 장르별 기록을 비교합니다.",
+      libraryGoalTitle:"독서 목표 추이",
+      libraryGoalBody:"설정한 주간 독서 목표와 실제 완독 기록을 주·월·연 단위로 비교합니다.",
+      libraryFilterTitle:"책 찾기와 보기 방식",
+      libraryFilterBody:"제목·저자 검색, 독서 상태 필터, 정렬 방식, 그리드·보드 보기를 선택할 수 있습니다.",
+      libraryShareTitle:"공개와 공유",
+      libraryShareBody:"책마다 공개 여부를 정하고, 공개한 책만 담은 공유 링크를 만들 수 있습니다.",
+      libraryBooksTitle:"책 목록",
+      libraryBooksBody:"등록한 책들이 표시되는 영역입니다. 책을 누르면 진행률, 독서시간, 문구와 회고를 자세히 기록할 수 있습니다.",
+      detailIntroTitle:"전체 기록 화면",
+      detailIntroBody:"이 목표의 누적 기록을 자세히 보는 화면입니다. 위에서 아래로 요약, 기간 통계, 연간 그리드, 월별 추이, 기록 입력, 전체 기록 순서로 확인합니다.",
+      detailSummaryTitle:"누적 요약",
+      detailSummaryBody:"연속일, 총 달성일, 기록 중 달성률 등 지금까지의 핵심 기록을 보여줍니다.",
+      detailPeriodTitle:"기간별 통계",
+      detailPeriodBody:"이번 주, 지난주, 최근 4주, 이번 달 등 가까운 기간의 목표 달성 흐름을 비교합니다.",
+      detailYearTitle:"연간 기록",
+      detailYearBody:"한 해 동안 목표를 달성한 날짜를 그리드로 보여줍니다. 연도를 바꿔 과거 기록도 확인할 수 있습니다.",
+      detailMonthTitle:"월별 추이",
+      detailMonthBody:"월별 평균 또는 달성률을 비교해서 계절별·월별 변화가 있었는지 확인합니다.",
+      detailEditTitle:"과거 날짜 기록",
+      detailEditBody:"오늘이 아닌 날짜의 기록을 추가하거나 수정할 때 사용하는 영역입니다.",
+      detailListTitle:"전체 기록 목록",
+      detailListBody:"저장된 기록을 월별·날짜별로 확인하고 필요하면 개별 기록을 삭제할 수 있습니다."
     },
     en:{
       replay:"Guide for this screen",
@@ -3727,7 +3755,35 @@ document
       todayRecordTitle:"Today's record",
       todayRecordBody:"Enter today's result here. Saving it updates the main dashboard and statistics immediately.",
       detailTitle:"All records",
-      detailBody:"Open this page when you want the yearly grid, monthly averages, and detailed date-by-date records."
+      detailBody:"Open this page when you want the yearly grid, monthly averages, and detailed date-by-date records.",
+      libraryIntroTitle:"My Library",
+      libraryIntroBody:"Manage books and reading statistics in one place. The guide moves from the yearly reading grid down through statistics, goal trends, filters, and your books.",
+      libraryGridTitle:"Yearly reading grid",
+      libraryGridBody:"See which days you read with the timer during the year. Darker squares mean more reading time that day.",
+      libraryStatsTitle:"Reading statistics",
+      libraryStatsBody:"Compare weekly reading time, monthly completions, yearly completions, and genres.",
+      libraryGoalTitle:"Reading goal trend",
+      libraryGoalBody:"Compare your weekly reading target with actual completions by week, month, or year.",
+      libraryFilterTitle:"Find and view books",
+      libraryFilterBody:"Search titles and authors, filter by status, change sorting, and switch between grid and board views.",
+      libraryShareTitle:"Privacy and sharing",
+      libraryShareBody:"Choose which books are public and create a sharing link containing only public books.",
+      libraryBooksTitle:"Book list",
+      libraryBooksBody:"Your books appear here. Open a book to record progress, reading time, quotes, and reflections.",
+      detailIntroTitle:"All records",
+      detailIntroBody:"This page shows the full history of this goal. The guide moves downward through summary, period statistics, yearly grid, monthly trend, record entry, and the full list.",
+      detailSummaryTitle:"History summary",
+      detailSummaryBody:"See your streak, total successful days, and overall success rate for recorded days.",
+      detailPeriodTitle:"Period statistics",
+      detailPeriodBody:"Compare recent performance such as this week, last week, the last four weeks, and this month.",
+      detailYearTitle:"Yearly records",
+      detailYearBody:"The yearly grid shows the dates when you achieved this goal. Change the year to review earlier records.",
+      detailMonthTitle:"Monthly trend",
+      detailMonthBody:"Compare monthly averages or success rates to see how the goal changes over time.",
+      detailEditTitle:"Record another date",
+      detailEditBody:"Use this area to add or update a record for a date other than today.",
+      detailListTitle:"Complete record list",
+      detailListBody:"Review saved records by month and date and delete an individual record when needed."
     },
     ja:{
       replay:"この画面のガイド",
@@ -3758,7 +3814,35 @@ document
       todayRecordTitle:"今日の記録",
       todayRecordBody:"今日の実績を入力して保存します。メイン画面と統計にすぐ反映されます。",
       detailTitle:"記録をまとめて見る",
-      detailBody:"年間グリッド、月別平均、日付別の詳細記録を見る画面です。"
+      detailBody:"年間グリッド、月別平均、日付別の詳細記録を見る画面です。",
+      libraryIntroTitle:"私の本棚",
+      libraryIntroBody:"本と読書統計をまとめて管理する画面です。年間グリッドから統計、目標推移、検索・並び替え、本一覧へ上から順に案内します。",
+      libraryGridTitle:"年間読書グリッド",
+      libraryGridBody:"タイマーで読書した日を一年単位で表示します。色が濃いほどその日の読書時間が長いことを表します。",
+      libraryStatsTitle:"読書統計",
+      libraryStatsBody:"週間読書時間、月別完読冊数、年別完読、ジャンル別記録を比較します。",
+      libraryGoalTitle:"読書目標の推移",
+      libraryGoalBody:"週間読書目標と実際の完読数を週・月・年単位で比較します。",
+      libraryFilterTitle:"本を探す・表示する",
+      libraryFilterBody:"タイトル・著者検索、状態フィルター、並び替え、グリッド・ボード表示を選べます。",
+      libraryShareTitle:"公開と共有",
+      libraryShareBody:"本ごとに公開範囲を設定し、公開した本だけを含む共有リンクを作成できます。",
+      libraryBooksTitle:"本の一覧",
+      libraryBooksBody:"登録した本が表示されます。本を開くと進捗、読書時間、引用、振り返りを詳しく記録できます。",
+      detailIntroTitle:"全記録画面",
+      detailIntroBody:"この目標の累積記録を詳しく確認する画面です。概要、期間統計、年間グリッド、月別推移、記録入力、全記録の順に上から案内します。",
+      detailSummaryTitle:"累積概要",
+      detailSummaryBody:"連続日数、総達成日数、記録日の達成率など主要な記録を表示します。",
+      detailPeriodTitle:"期間別統計",
+      detailPeriodBody:"今週、先週、直近4週間、今月など最近の達成状況を比較します。",
+      detailYearTitle:"年間記録",
+      detailYearBody:"一年の達成日をグリッドで表示します。年を変更して過去の記録も確認できます。",
+      detailMonthTitle:"月別推移",
+      detailMonthBody:"月別平均または達成率を比較し、時期による変化を確認します。",
+      detailEditTitle:"過去日の記録",
+      detailEditBody:"今日以外の日付の記録を追加・修正するための領域です。",
+      detailListTitle:"全記録一覧",
+      detailListBody:"保存済みの記録を月・日付別に確認し、必要なら個別に削除できます。"
     },
     "zh-CN":{
       replay:"本页指南",
@@ -3789,7 +3873,35 @@ document
       todayRecordTitle:"今日记录",
       todayRecordBody:"在这里输入并保存今天的结果，主页面和统计会立即更新。",
       detailTitle:"查看全部记录",
-      detailBody:"查看年度网格、月平均和按日期整理的详细记录。"
+      detailBody:"查看年度网格、月平均和按日期整理的详细记录。",
+      libraryIntroTitle:"我的书房",
+      libraryIntroBody:"在一个页面管理书籍和阅读统计。指南会从年度阅读网格开始，依次介绍统计、目标趋势、筛选和书籍列表。",
+      libraryGridTitle:"年度阅读网格",
+      libraryGridBody:"按全年显示使用计时器阅读的日期。颜色越深表示当天阅读时间越长。",
+      libraryStatsTitle:"阅读统计",
+      libraryStatsBody:"比较每周阅读时间、每月完读、年度完读和类型统计。",
+      libraryGoalTitle:"阅读目标趋势",
+      libraryGoalBody:"按周、月、年比较每周阅读目标和实际完读记录。",
+      libraryFilterTitle:"查找和查看书籍",
+      libraryFilterBody:"可以搜索标题和作者、按状态筛选、调整排序，并切换网格或看板视图。",
+      libraryShareTitle:"公开与分享",
+      libraryShareBody:"设置每本书的公开状态，并创建只包含公开书籍的分享链接。",
+      libraryBooksTitle:"书籍列表",
+      libraryBooksBody:"这里显示已登记的书籍。打开书籍后可以详细记录进度、阅读时间、摘录和回顾。",
+      detailIntroTitle:"全部记录",
+      detailIntroBody:"这里查看该目标的累计记录。指南会从上到下依次介绍摘要、期间统计、年度网格、月度趋势、记录输入和全部记录。",
+      detailSummaryTitle:"累计摘要",
+      detailSummaryBody:"显示连续天数、总达成天数和记录日的整体达成率。",
+      detailPeriodTitle:"期间统计",
+      detailPeriodBody:"比较本周、上周、最近4周和本月等近期目标表现。",
+      detailYearTitle:"年度记录",
+      detailYearBody:"年度网格显示达成目标的日期，也可以切换年份查看历史记录。",
+      detailMonthTitle:"月度趋势",
+      detailMonthBody:"比较每月平均值或达成率，观察目标随时间的变化。",
+      detailEditTitle:"补记日期",
+      detailEditBody:"用于添加或修改非今天日期的记录。",
+      detailListTitle:"完整记录列表",
+      detailListBody:"按月份和日期查看已保存记录，并可删除单条记录。"
     },
     "zh-TW":{
       replay:"本頁指南",
@@ -3820,7 +3932,35 @@ document
       todayRecordTitle:"今日記錄",
       todayRecordBody:"在這裡輸入並儲存今天的結果，主頁與統計會立即更新。",
       detailTitle:"查看全部記錄",
-      detailBody:"查看年度網格、月平均與按日期整理的詳細記錄。"
+      detailBody:"查看年度網格、月平均與按日期整理的詳細記錄。",
+      libraryIntroTitle:"我的書房",
+      libraryIntroBody:"在同一頁管理書籍與閱讀統計。指南會從年度閱讀網格開始，依序介紹統計、目標趨勢、篩選與書籍列表。",
+      libraryGridTitle:"年度閱讀網格",
+      libraryGridBody:"以全年顯示使用計時器閱讀的日期。顏色越深代表當天閱讀時間越長。",
+      libraryStatsTitle:"閱讀統計",
+      libraryStatsBody:"比較每週閱讀時間、每月完讀、年度完讀與類型統計。",
+      libraryGoalTitle:"閱讀目標趨勢",
+      libraryGoalBody:"按週、月、年比較每週閱讀目標與實際完讀記錄。",
+      libraryFilterTitle:"尋找與查看書籍",
+      libraryFilterBody:"可搜尋書名與作者、依狀態篩選、調整排序，並切換網格或看板檢視。",
+      libraryShareTitle:"公開與分享",
+      libraryShareBody:"設定每本書的公開狀態，並建立只包含公開書籍的分享連結。",
+      libraryBooksTitle:"書籍列表",
+      libraryBooksBody:"這裡顯示已登記的書籍。開啟書籍後可詳細記錄進度、閱讀時間、摘錄與回顧。",
+      detailIntroTitle:"全部記錄",
+      detailIntroBody:"這裡查看此目標的累積記錄。指南會由上到下依序介紹摘要、期間統計、年度網格、月度趨勢、記錄輸入與全部記錄。",
+      detailSummaryTitle:"累積摘要",
+      detailSummaryBody:"顯示連續天數、總達成天數與記錄日的整體達成率。",
+      detailPeriodTitle:"期間統計",
+      detailPeriodBody:"比較本週、上週、最近4週與本月等近期目標表現。",
+      detailYearTitle:"年度記錄",
+      detailYearBody:"年度網格顯示達成目標的日期，也可切換年份查看歷史記錄。",
+      detailMonthTitle:"月度趨勢",
+      detailMonthBody:"比較每月平均值或達成率，觀察目標隨時間的變化。",
+      detailEditTitle:"補記日期",
+      detailEditBody:"用於新增或修改非今天日期的記錄。",
+      detailListTitle:"完整記錄列表",
+      detailListBody:"按月份與日期查看已儲存記錄，並可刪除單筆記錄。"
     }
   };
 
@@ -3861,14 +4001,70 @@ document
     return steps;
   }
 
+  function libraryGuideSteps(){
+    return [
+      {target:"#library .lib-header",title:guideT("libraryIntroTitle"),body:guideT("libraryIntroBody"),raw:true},
+      {target:"#library .contrib-wrap",title:guideT("libraryGridTitle"),body:guideT("libraryGridBody"),raw:true},
+      {target:"#library .stats-wrap",title:guideT("libraryStatsTitle"),body:guideT("libraryStatsBody"),raw:true},
+      {target:"#readingGoalAnalytics",title:guideT("libraryGoalTitle"),body:guideT("libraryGoalBody"),raw:true},
+      {target:"#library .toolbar:not(.share-toolbar)",title:guideT("libraryFilterTitle"),body:guideT("libraryFilterBody"),raw:true},
+      {target:"#library .share-toolbar",title:guideT("libraryShareTitle"),body:guideT("libraryShareBody"),raw:true},
+      {target:"#library #grid:not(.hidden), #library #board:not(.hidden)",title:guideT("libraryBooksTitle"),body:guideT("libraryBooksBody"),raw:true}
+    ];
+  }
+
+  function routineDetailGuideSteps(r){
+    return [
+      {target:"#routineDetailTitle",title:guideT("detailIntroTitle"),body:guideT("detailIntroBody"),raw:true},
+      {target:"#routineDetailStats",title:guideT("detailSummaryTitle"),body:guideT("detailSummaryBody"),raw:true},
+      {target:"#routinePeriodStats",title:guideT("detailPeriodTitle"),body:guideT("detailPeriodBody"),raw:true},
+      {target:"#routineDetailScreen .routine-year-card",title:guideT("detailYearTitle"),body:guideT("detailYearBody"),raw:true},
+      {target:"#routineMonthChart",title:guideT("detailMonthTitle"),body:guideT("detailMonthBody"),raw:true},
+      {target:"#routineDetailScreen .routine-edit-row",title:guideT("detailEditTitle"),body:guideT("detailEditBody"),raw:true},
+      {target:"#routineEntryList",title:guideT("detailListTitle"),body:guideT("detailListBody"),raw:true}
+    ];
+  }
+
+  function absoluteTop(el){
+    const r=el.getBoundingClientRect();
+    return r.top + window.scrollY;
+  }
+
+  function sortGuideStepsTopDown(steps){
+    return steps
+      .map((step,index)=>({step,index,el:document.querySelector(step.target)}))
+      .filter(x=>x.el && x.el.offsetParent!==null)
+      .sort((a,b)=>{
+        const dy=absoluteTop(a.el)-absoluteTop(b.el);
+        return Math.abs(dy)>2 ? dy : a.index-b.index;
+      })
+      .map(x=>x.step);
+  }
+
+  function startLibraryGuide(force=false){
+    startGuide(libraryGuideSteps(),`${CONTEXT_GUIDE_PREFIX}library`,force);
+  }
+
+  function startRoutineDetailGuide(r,force=false){
+    if(!r) return;
+    startGuide(routineDetailGuideSteps(r),`${CONTEXT_GUIDE_PREFIX}detail:${r.id}`,force);
+  }
+
   function startGuide(steps,key,force=false){
     if(!force && localStorage.getItem(key)==="done") return;
     if(document.body.classList.contains("auth-locked")) return;
     ensureOnboardingUi();
     state.activeGuideKey=key;
-    state.onboardingSteps=steps;
-    state.onboardingIndex=0;
-    setTimeout(()=>showOnboardingStep(0),100);
+
+    // Always begin at the top of the current page, then sort only visible
+    // targets by their real document position. This prevents a guide from
+    // jumping down, back up, and down again when dynamic panels are inserted.
+    window.scrollTo({top:0,left:0,behavior:"auto"});
+    setTimeout(()=>{
+      state.onboardingSteps=sortGuideStepsTopDown(steps);
+      state.onboardingIndex=0;
+      showOnboardingStep(0);
+    },80);
   }
 
   function startReadingGuide(force=false){
@@ -3882,18 +4078,36 @@ document
 
   function ensureContextGuideButton(screenId,onClick){
     const screen=document.getElementById(screenId);
-    const wrap=screen?.querySelector(".home-wrap");
+    const wrap=screen?.querySelector(".home-wrap") || screen;
     if(!wrap) return;
-    let btn=wrap.querySelector(".context-guide-btn");
+
+    // Library has its own action row, so place the replay button there instead of
+    // floating over the existing Export / Import controls.
+    if(screenId==="library"){
+      const actions=screen.querySelector(".lib-header .data-actions");
+      if(!actions) return;
+      let btn=actions.querySelector(".context-guide-btn");
+      if(!btn){
+        btn=document.createElement("button");
+        btn.type="button";
+        btn.className="icon-btn context-guide-btn";
+        btn.style.position="static";
+        actions.appendChild(btn);
+      }
+      btn.innerHTML=`<span aria-hidden="true">?</span><span>${guideT("replay")}</span>`;
+      btn.onclick=onClick;
+      return;
+    }
+
+    if(getComputedStyle(wrap).position==="static") wrap.style.position="relative";
+    let btn=wrap.querySelector(":scope > .context-guide-btn");
     if(!btn){
       btn=document.createElement("button");
       btn.type="button";
       btn.className="context-guide-btn";
-      btn.innerHTML=`<span aria-hidden="true">?</span><span>${guideT("replay")}</span>`;
       wrap.appendChild(btn);
-    }else{
-      btn.innerHTML=`<span aria-hidden="true">?</span><span>${guideT("replay")}</span>`;
     }
+    btn.innerHTML=`<span aria-hidden="true">?</span><span>${guideT("replay")}</span>`;
     btn.onclick=onClick;
   }
 
@@ -4075,6 +4289,22 @@ document
       };
     }
 
+    if(typeof renderLibrary==="function"){
+      const baseRenderLibrary=renderLibrary;
+      renderLibrary=function(...args){
+        const out=baseRenderLibrary(...args);
+        requestAnimationFrame(()=>{
+          // renderStats may add the reading-goal analytics on the next frame.
+          setTimeout(()=>{
+            ensureContextGuideButton("library",()=>startLibraryGuide(true));
+            startLibraryGuide(false);
+            enhanceAccessibility(document);
+          },120);
+        });
+        return out;
+      };
+    }
+
     if(typeof renderHome==="function"){
       const baseRenderHome=renderHome;
       renderHome=function(...args){
@@ -4117,9 +4347,12 @@ document
       const baseRenderRoutineDetail=renderRoutineDetail;
       renderRoutineDetail=function(routineId,...args){
         const out=baseRenderRoutineDetail(routineId,...args);
+        const r=getRoutine(routineId);
         requestAnimationFrame(()=>{
           document.getElementById("wakeTrendPanel")?.remove();
           document.getElementById("routineGoalTrendPanel")?.remove();
+          ensureContextGuideButton("routineDetailScreen",()=>startRoutineDetailGuide(r,true));
+          setTimeout(()=>startRoutineDetailGuide(r,false),160);
           enhanceAccessibility(document);
         });
         return out;
