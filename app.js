@@ -1,5 +1,5 @@
-const SUPABASE_URL = "https://pywwlrfxqrljriumxmwf.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_DDpOhpK3oex7Fi85jTQ0rQ_8y2bdngi";
+const SUPABASE_URL = "여기에_기존_GitHub_app.js의_SUPABASE_URL_값_붙여넣기";
+const SUPABASE_PUBLISHABLE_KEY = "여기에_기존_GitHub_app.js의_SUPABASE_PUBLISHABLE_KEY_값_붙여넣기";
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
@@ -8,6 +8,7 @@ const supabaseClient = window.supabase.createClient(
 
 const STORAGE_KEY = "book-library-v1";
 const LEGACY_STORAGE_KEY = STORAGE_KEY;
+const GUEST_MODE_KEY = "bookaholic-guest-mode-v1";
 
 function getUserStorageKey(userId) {
   return userId
@@ -70,6 +71,8 @@ let data = { schemaVersion: SCHEMA_VERSION, books: [], baselineBooks: 0 };
 let currentBookId = null;
 let cardRectCache = null;
 let lastFetchedCover = null;
+let lastFetchedBookMeta = null;
+let bookSearchCandidates = [];
 
 // view/filter state
 let viewMode = "grid";      // grid | board
@@ -1848,7 +1851,98 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
   e.target.value = "";
 });
 
+function ensureBookSearchUi(){
+  const box=document.querySelector("#addModal .modal-box");
+  const status=document.getElementById("fetchStatus");
+  if(!box || !status) return;
+  let hint=document.getElementById("bookSearchHint");
+  if(!hint){
+    hint=document.createElement("div");
+    hint.id="bookSearchHint";
+    hint.className="book-search-hint sans";
+    hint.innerHTML="책 제목·저자·ISBN으로 검색한 뒤 <b>내가 실제로 읽는 표지/출판사 판본</b>을 골라보세요.";
+    status.insertAdjacentElement("beforebegin",hint);
+  }
+  let results=document.getElementById("bookSearchResults");
+  if(!results){
+    results=document.createElement("div");
+    results.id="bookSearchResults";
+    results.className="book-search-results hidden";
+    status.insertAdjacentElement("afterend",results);
+  }
+  let selected=document.getElementById("selectedBookEdition");
+  if(!selected){
+    selected=document.createElement("div");
+    selected.id="selectedBookEdition";
+    selected.className="selected-book-edition hidden";
+    results.insertAdjacentElement("afterend",selected);
+  }
+  const btn=document.getElementById("fetchInfoBtn"); if(btn) btn.textContent="표지 찾기";
+  const label=document.querySelector('#addModal label[for="fSearchQuery"]');
+  document.getElementById("fSearchQuery")?.setAttribute("placeholder","예: 데미안 헤르만 헤세 / ISBN");
+}
+
+function normalizeCoverUrl(url){
+  if(!url) return null;
+  return String(url).replace(/^http:\/\//,"https://").replace(/&edge=curl/g,"");
+}
+function googleCandidate(item){
+  const info=item?.volumeInfo||{};
+  const ids=info.industryIdentifiers||[];
+  const isbn13=ids.find(x=>x.type==="ISBN_13")?.identifier||"";
+  const isbn10=ids.find(x=>x.type==="ISBN_10")?.identifier||"";
+  const isbn=isbn13||isbn10;
+  let cover=normalizeCoverUrl(info.imageLinks?.extraLarge||info.imageLinks?.large||info.imageLinks?.medium||info.imageLinks?.small||info.imageLinks?.thumbnail||info.imageLinks?.smallThumbnail||null);
+  if(!cover && isbn) cover=`https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-L.jpg?default=false`;
+  return {
+    source:"Google Books", sourceId:item?.id||"", title:info.title||"", subtitle:info.subtitle||"",
+    author:(info.authors||[]).join(", "), publisher:info.publisher||"", publishedDate:info.publishedDate||"",
+    pages:Number(info.pageCount)||0, isbn, isbn13, isbn10, cover, language:info.language||""
+  };
+}
+async function searchBookCandidates(query){
+  const raw=String(query||"").trim(); if(!raw) return [];
+  const compact=raw.replace(/[\s-]/g,"");
+  const q=/^(?:\d{10}|\d{13})$/.test(compact)?`isbn:${compact}`:raw;
+  const url=`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=24&printType=books&orderBy=relevance`;
+  const res=await fetch(url);
+  if(!res.ok) throw new Error(`Google Books ${res.status}`);
+  const json=await res.json();
+  const seen=new Set();
+  return (json.items||[]).map(googleCandidate).filter(c=>{
+    if(!c.title) return false;
+    const key=c.isbn||`${c.title}|${c.publisher}|${c.publishedDate}|${c.sourceId}`;
+    if(seen.has(key)) return false; seen.add(key); return true;
+  });
+}
+function bookCandidateMeta(c){
+  return [c.author,c.publisher,c.publishedDate,c.pages?`${c.pages}쪽`:"",c.isbn?`ISBN ${c.isbn}`:""].filter(Boolean).join(" · ");
+}
+function renderBookSearchResults(candidates, hostId="bookSearchResults", mode="add"){
+  const host=document.getElementById(hostId); if(!host) return;
+  if(!candidates.length){ host.classList.remove("hidden"); host.innerHTML=`<div class="book-search-empty">검색 결과가 없어요. 제목·저자 또는 ISBN으로 다시 검색해 보세요.</div>`; return; }
+  host.classList.remove("hidden");
+  host.innerHTML=candidates.map((c,i)=>`<article class="book-edition-card" data-book-result="${i}">
+    <div class="book-edition-cover">${c.cover?`<img src="${escapeAttr(c.cover)}" alt="" loading="lazy" onerror="this.closest('.book-edition-cover').classList.add('cover-missing');this.remove()">`:`<span>📖</span>`}</div>
+    <div class="book-edition-info"><b data-i18n-ignore="true">${escapeHtml(c.title)}</b>${c.subtitle?`<span data-i18n-ignore="true">${escapeHtml(c.subtitle)}</span>`:""}<small data-i18n-ignore="true">${escapeHtml(bookCandidateMeta(c)||"판본 정보 없음")}</small></div>
+    <div class="book-edition-actions">${mode==="edit"?`<button type="button" class="secondary" data-cover-only="${i}">표지만</button><button type="button" data-edition-apply="${i}">이 판본</button>`:`<button type="button" data-book-select="${i}">이 판본 선택</button>`}</div>
+  </article>`).join("");
+}
+function selectBookCandidate(index){
+  const c=bookSearchCandidates[Number(index)]; if(!c) return;
+  lastFetchedCover=c.cover||null; lastFetchedBookMeta=c;
+  document.getElementById("fTitle").value=c.title||"";
+  document.getElementById("fAuthor").value=c.author||"";
+  document.getElementById("fPublisher").value=c.publisher||"";
+  if(c.pages) document.getElementById("fPages").value=c.pages;
+  document.querySelectorAll("#bookSearchResults .book-edition-card").forEach(x=>x.classList.toggle("selected",x.dataset.bookResult===String(index)));
+  const sel=document.getElementById("selectedBookEdition");
+  if(sel){ sel.classList.remove("hidden"); sel.innerHTML=`<span>선택한 판본</span><b data-i18n-ignore="true">${escapeHtml(c.title)}</b><small data-i18n-ignore="true">${escapeHtml(bookCandidateMeta(c))}</small>`; }
+  document.getElementById("fetchStatus").textContent="선택한 판본의 제목·저자·출판사·페이지·표지를 적용했어요. 아래에서 수정할 수 있어요.";
+}
+
 function openAddModal(){
+  ensureBookSearchUi();
   document.getElementById("fSearchQuery").value = "";
   document.getElementById("fTitle").value = "";
   document.getElementById("fAuthor").value = "";
@@ -1856,37 +1950,27 @@ function openAddModal(){
   document.getElementById("fTranslator").value = "";
   document.getElementById("fPages").value = "";
   document.getElementById("fetchStatus").textContent = "";
-  lastFetchedCover = null;
+  document.getElementById("bookSearchResults")?.classList.add("hidden");
+  document.getElementById("selectedBookEdition")?.classList.add("hidden");
+  lastFetchedCover = null; lastFetchedBookMeta=null; bookSearchCandidates=[];
   document.getElementById("fStatus").value = "not_started";
   document.getElementById("addModal").classList.remove("hidden");
+  setTimeout(()=>document.getElementById("fSearchQuery")?.focus(),80);
 }
-function closeAddModal(){
-  document.getElementById("addModal").classList.add("hidden");
-}
+function closeAddModal(){ document.getElementById("addModal").classList.add("hidden"); }
 
 async function fetchBookInfo(){
-  const q = document.getElementById("fSearchQuery").value.trim() || document.getElementById("fTitle").value.trim();
-  const statusEl = document.getElementById("fetchStatus");
-  if(!q){ statusEl.textContent = "검색어를 입력해 주세요."; return; }
-  statusEl.textContent = "검색 중…";
+  ensureBookSearchUi();
+  const q=document.getElementById("fSearchQuery").value.trim()||document.getElementById("fTitle").value.trim();
+  const statusEl=document.getElementById("fetchStatus");
+  if(!q){ statusEl.textContent="책 제목·저자 또는 ISBN을 입력해 주세요."; return; }
+  statusEl.textContent="판본과 표지를 찾는 중…";
+  const host=document.getElementById("bookSearchResults"); if(host){host.classList.add("hidden");host.innerHTML="";}
   try{
-    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}`);
-    const json = await res.json();
-    const item = json.items && json.items[0];
-    if(!item){ statusEl.textContent = "검색 결과가 없어요. 직접 입력해 주세요."; return; }
-    const info = item.volumeInfo || {};
-    document.getElementById("fTitle").value = info.title || q;
-    document.getElementById("fAuthor").value = (info.authors || []).join(", ");
-    document.getElementById("fPublisher").value = info.publisher || "";
-    if(info.pageCount) document.getElementById("fPages").value = info.pageCount;
-    lastFetchedCover = info.imageLinks ? (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || null) : null;
-    if(lastFetchedCover) lastFetchedCover = lastFetchedCover.replace("http://","https://");
-    statusEl.textContent = lastFetchedCover
-      ? "정보와 표지를 가져왔어요. 옮긴이나 페이지 수는 확인 후 필요하면 수정해 주세요."
-      : "정보를 가져왔어요 (표지 이미지는 없었어요). 옮긴이나 페이지 수는 확인해 주세요.";
-  }catch(e){
-    statusEl.textContent = "정보를 가져오지 못했어요. 직접 입력해 주세요.";
-  }
+    bookSearchCandidates=await searchBookCandidates(q);
+    renderBookSearchResults(bookSearchCandidates,"bookSearchResults","add");
+    statusEl.textContent=bookSearchCandidates.length?`${bookSearchCandidates.length}개의 판본을 찾았어요. 실제 읽는 표지를 골라주세요.`:"검색 결과가 없어요. 직접 입력해도 됩니다.";
+  }catch(e){ console.error(e); statusEl.textContent="책 정보를 가져오지 못했어요. 잠시 뒤 다시 시도하거나 직접 입력해 주세요."; }
 }
 
 async function confirmAddBook(){
@@ -1911,6 +1995,10 @@ async function confirmAddBook(){
     review: "",
     coverColor: COVER_PALETTE[data.books.length % COVER_PALETTE.length],
     coverImage: lastFetchedCover,
+    isbn: lastFetchedBookMeta?.isbn || "",
+    publishedDate: lastFetchedBookMeta?.publishedDate || "",
+    bookSource: lastFetchedBookMeta?.source || "",
+    sourceId: lastFetchedBookMeta?.sourceId || "",
     rating: 0,
     genres: [],
     updatedAt: Date.now()
@@ -1922,6 +2010,8 @@ async function confirmAddBook(){
 }
 
 document.getElementById("fetchInfoBtn").addEventListener("click", fetchBookInfo);
+document.getElementById("fSearchQuery")?.addEventListener("keydown",(e)=>{if(e.key==="Enter"){e.preventDefault();fetchBookInfo();}});
+document.getElementById("addModal")?.addEventListener("click",(e)=>{const btn=e.target.closest("[data-book-select]");if(btn) selectBookCandidate(btn.dataset.bookSelect);});
 document.getElementById("cancelAddBtn").addEventListener("click", closeAddModal);
 document.getElementById("confirmAddBtn").addEventListener("click", confirmAddBook);
 
@@ -2037,6 +2127,7 @@ function renderDetail(){
       <div class="meta-row"><span class="meta-label sans">출판사</span><input id="publisherInput" value="${escapeHtml(b.publisher||"")}" placeholder="입력해 주세요" /></div>
       <div class="meta-row"><span class="meta-label sans">옮긴이</span><input id="translatorInput" value="${escapeHtml(b.translator||"")}" placeholder="있다면 입력" /></div>
     </div>
+    <div class="book-edition-toolbar"><button type="button" class="secondary" id="changeBookEditionBtn">🖼 표지·판본 찾기</button>${b.isbn?`<span class="sans">ISBN ${escapeHtml(b.isbn)}</span>`:""}</div>
     <div class="meta-dates">
       <div class="meta-date-chip ${b.startDate?"filled":""}">
         <span class="mdc-label sans">시작일 (눌러서 변경)</span>
@@ -2206,6 +2297,7 @@ function renderDetail(){
   document.getElementById("translatorInput").addEventListener("blur", async (e)=>{
     await updateBook({ translator: e.target.value.trim() });
   });
+  document.getElementById("changeBookEditionBtn")?.addEventListener("click",()=>openEditionPickerForBook(b));
 
   document.getElementById("currentPageInput").addEventListener("change", async (e)=>{
     const cp = Math.max(0, Math.min(b.totalPages || Number.MAX_SAFE_INTEGER, parseInt(e.target.value)||0));
@@ -2372,19 +2464,7 @@ function updateTimerDisplay(){
 
 function validatePasswordStrength(password){
   if(typeof password !== "string" || password.length < 8){
-    return "비밀번호는 8자 이상이어야 합니다.";
-  }
-  if(!/[A-Z]/.test(password)){
-    return "비밀번호에 대문자를 1자 이상 포함해 주세요.";
-  }
-  if(!/[a-z]/.test(password)){
-    return "비밀번호에 소문자를 1자 이상 포함해 주세요.";
-  }
-  if(!/\d/.test(password)){
-    return "비밀번호에 숫자를 1자 이상 포함해 주세요.";
-  }
-  if(!/[^A-Za-z0-9]/.test(password)){
-    return "비밀번호에 특수문자를 1자 이상 포함해 주세요.";
+    return "비밀번호는 8자 이상이면 됩니다.";
   }
   return "";
 }
@@ -2393,6 +2473,27 @@ function signUpLooksLikeExistingAccount(data){
   const identities = data?.user?.identities;
   return Array.isArray(identities) && identities.length === 0;
 }
+
+// ---------- Low-friction guest access ----------
+function isGuestMode(){
+  try{ return localStorage.getItem(GUEST_MODE_KEY)==="1"; }catch(_){ return false; }
+}
+
+async function startGuestMode(){
+  try{ localStorage.setItem(GUEST_MODE_KEY,"1"); }catch(_){}
+  currentStorageKey = getUserStorageKey(null);
+  document.body.classList.remove("auth-locked");
+  document.getElementById("authGate")?.classList.add("hidden");
+  const raw = localStorage.getItem(currentStorageKey);
+  if(!raw){
+    data = normalizeData({schemaVersion:SCHEMA_VERSION,books:[],baselineBooks:0,routines:[]});
+    await saveData({backup:false,cloud:false});
+  }
+  await loadData();
+  showToast("회원가입 없이 시작했어요. 기록은 이 기기에 자동 저장됩니다.","success",4800);
+  window.ensureGuestConnectDock?.();
+}
+window.startGuestMode = startGuestMode;
 
 // ---------- Supabase GitHub Login ----------
 async function signInWithGitHub() {
@@ -2486,7 +2587,7 @@ document.getElementById("emailAuthBtn")?.addEventListener("click", () => {
   }
 
   if (signUpBtn) {
-    signUpBtn.textContent = "회원가입";
+    signUpBtn.textContent = "이메일로 가입";
   }
 
   if (passwordConfirm) {
@@ -2516,7 +2617,7 @@ document.getElementById("emailAuthCancelBtn")?.addEventListener("click", () => {
 
   // 버튼 이름 원래대로
   if (signUpBtn) {
-    signUpBtn.textContent = "회원가입";
+    signUpBtn.textContent = "이메일로 가입";
   }
 
   // 비밀번호 확인값 지우기
@@ -2681,90 +2782,48 @@ document.getElementById("setPasswordSaveBtn")?.addEventListener("click", async (
 });
 
 document.getElementById("emailSignUpBtn")?.addEventListener("click", async () => {
-  const confirmGroup = document.getElementById("emailPasswordConfirmGroup");
-  const signUpBtn = document.getElementById("emailSignUpBtn");
-  const message = document.getElementById("emailAuthMessage");
-
-  // 첫 번째 클릭: 회원가입 입력 화면으로 전환
-  if (confirmGroup?.classList.contains("hidden")) {
-    confirmGroup.classList.remove("hidden");
-
-    if (signUpBtn) {
-      signUpBtn.textContent = "회원가입 완료";
-    }
-
-    if (message) {
-      message.textContent =
-        "비밀번호를 한 번 더 입력한 뒤 회원가입 완료를 눌러 주세요.";
-    }
-
-    return;
-  }
-
-  // 두 번째 클릭: 실제 회원가입 진행
   const email = document.getElementById("emailAuthEmail")?.value.trim();
   const password = document.getElementById("emailAuthPassword")?.value;
-  const passwordConfirm =
-    document.getElementById("emailAuthPasswordConfirm")?.value;
+  const message = document.getElementById("emailAuthMessage");
 
-  if (!email || !password || !passwordConfirm) {
-    if (message) {
-      message.textContent =
-        "이메일과 비밀번호를 모두 입력해 주세요.";
-    }
-    return;
-  }
-
-  if (password !== passwordConfirm) {
-    if (message) {
-      message.textContent =
-        "비밀번호가 서로 일치하지 않습니다.";
-    }
+  if(!email || !password){
+    if(message) message.textContent = "이메일과 비밀번호만 입력하면 바로 가입할 수 있어요.";
     return;
   }
 
   const passwordIssue = validatePasswordStrength(password);
-  if (passwordIssue) {
-    if (message) {
-      message.textContent = passwordIssue;
-    }
+  if(passwordIssue){
+    if(message) message.textContent = passwordIssue;
     return;
   }
 
-  if (message) {
-    message.textContent = "회원가입 처리 중...";
-  }
+  if(message) message.textContent = "가입 요청 중…";
 
   const { data, error } = await supabaseClient.auth.signUp({
-    email: email,
-    password: password,
-    options: {
-      emailRedirectTo: "https://binnaaaak.github.io/Bookaholic_gpt/"
-    }
+    email,
+    password,
+    options: { emailRedirectTo: "https://binnaaaak.github.io/Bookaholic_gpt/" }
   });
 
-  if (error) {
+  if(error){
     console.error(error);
-
-    if (message) {
-      message.textContent = "회원가입에 실패했습니다: " + error.message;
-    }
-
-    return;
-  }
-
-  if (signUpLooksLikeExistingAccount(data)) {
-    if (message) {
-      message.textContent =
-        "이미 가입된 이메일일 수 있습니다. 로그인하거나 비밀번호 찾기를 이용해 주세요.";
+    const code = String(error.code||"");
+    const msg = String(error.message||"").toLowerCase();
+    if(code==="over_email_send_rate_limit" || msg.includes("rate limit")){
+      if(message) message.textContent = "인증 메일 발송 한도에 도달했어요. 비밀번호 문제는 아니에요. 잠시 후 다시 시도하거나 ‘회원가입 없이 시작’을 이용해 주세요.";
+      showToast("인증 메일 발송 한도에 도달했어요. 회원가입 없이도 바로 시작할 수 있어요.","error",6500);
+    }else{
+      if(message) message.textContent = "회원가입에 실패했습니다: " + error.message;
     }
     return;
   }
 
-  if (message) {
-    message.textContent =
-      "회원가입 요청이 완료됐습니다. 이메일로 받은 인증 링크를 확인해 주세요.";
+  if(signUpLooksLikeExistingAccount(data)){
+    if(message) message.textContent = "이미 가입된 이메일일 수 있어요. 로그인하거나 비밀번호 찾기를 이용해 주세요.";
+    return;
   }
+
+  if(message) message.textContent = "가입 요청 완료! 받은 메일의 인증 링크를 한 번만 눌러 주세요.";
 });
 
 document.getElementById("emailLoginBtn")?.addEventListener("click", async () => {
@@ -2801,6 +2860,7 @@ document.getElementById("emailLoginBtn")?.addEventListener("click", async () => 
   if (message) {
     message.textContent = "로그인되었습니다.";
   }
+  try{ localStorage.removeItem(GUEST_MODE_KEY); }catch(_){}
 
   document.getElementById("emailAuthModal")?.classList.add("hidden");
 
@@ -2831,6 +2891,7 @@ supabaseClient.auth.getSession().then(async ({ data: sessionData }) => {
   updateAuthUI(session);
 
   if (session?.user) {
+    try{ localStorage.removeItem(GUEST_MODE_KEY); }catch(_){}
     document.body.classList.remove("auth-locked");
     
     // 로그인 상태: 로그인 전용 화면 숨기기
@@ -2853,41 +2914,35 @@ if (restored) {
   if (hasLocalData) {
     await loadData();
   } else {
-    // 정말 처음 가입한 사용자는 빈 MBO로 시작
-    data = normalizeData({
-      schemaVersion: SCHEMA_VERSION,
-      books: [],
-      baselineBooks: 0,
-      routines: []
-    });
-
-    await saveData({
-      backup: false,
-      cloud: false
-    });
-
+    // 새 계정이라면 게스트로 먼저 써본 기록을 자동으로 이어받음
+    const guestRaw = localStorage.getItem(getUserStorageKey(null));
+    let guestData = null;
+    try{ if(guestRaw) guestData = JSON.parse(guestRaw); }catch(_){}
+    if(guestData && plausibleData(guestData) && ((guestData.books||[]).length || (guestData.routines||[]).some(r=>(r.entries||[]).length))){
+      data = normalizeData(guestData);
+      await saveData({backup:false});
+      showToast("체험 중 기록을 새 계정으로 이어왔어요.","success",5000);
+    }else{
+      data = normalizeData({schemaVersion:SCHEMA_VERSION,books:[],baselineBooks:0,routines:[]});
+      await saveData({backup:false,cloud:false});
+    }
     applyMbo();
   }
 }
 
   } else {
-    document.body.classList.add("auth-locked");
-    
-    // 로그아웃 상태: 개인 화면 전부 숨기기
     currentStorageKey = getUserStorageKey(null);
-
-    data = normalizeData({
-      schemaVersion: SCHEMA_VERSION,
-      books: [],
-      baselineBooks: 0,
-      routines: []
-    });
-
-    // MBO, 서재 등 기존 화면 숨기기
-    hideAllScreens();
-
-    // 로그인 / 회원가입 시작 화면만 표시
-    document.getElementById("authGate")?.classList.remove("hidden");
+    if(isGuestMode()){
+      document.body.classList.remove("auth-locked");
+      document.getElementById("authGate")?.classList.add("hidden");
+      await loadData();
+      setTimeout(()=>window.ensureGuestConnectDock?.(),80);
+    }else{
+      document.body.classList.add("auth-locked");
+      data = normalizeData({schemaVersion:SCHEMA_VERSION,books:[],baselineBooks:0,routines:[]});
+      hideAllScreens();
+      document.getElementById("authGate")?.classList.remove("hidden");
+    }
   }
 });
 
@@ -4622,4 +4677,80 @@ document
 
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",initUxSuite,{once:true});
   else initUxSuite();
+})();
+
+
+/* ==========================================================================\n   Bookaholic 026: low-friction entry + real book covers / edition picker\n   ========================================================================== */
+(() => {
+  function tr026(s){ try{return typeof tr==="function"?tr(s):s;}catch(_){return s;} }
+
+  function ensureGuestAuthUi(){
+    const gate=document.getElementById("authGate");
+    if(gate && !document.getElementById("guestStartBtn")){
+      const wrap=document.createElement("div");
+      wrap.className="guest-start-wrap sans";
+      wrap.innerHTML=`<button id="guestStartBtn" type="button" class="guest-start-btn">✨ ${tr026("회원가입 없이 바로 시작")}</button><p>${tr026("이 기기에 자동 저장됩니다. 나중에 계정을 연결하면 기록을 이어갈 수 있어요.")}</p>`;
+      const emailBtn=document.getElementById("authGateEmailBtn");
+      (emailBtn?.parentElement||gate).appendChild(wrap);
+      wrap.querySelector("#guestStartBtn").onclick=startGuestMode;
+    }
+    const modal=document.getElementById("emailAuthModal");
+    if(modal && !document.getElementById("emailGuestStartBtn")){
+      document.getElementById("emailPasswordConfirmGroup")?.classList.add("hidden");
+      const actions=modal.querySelector(".modal-actions");
+      const btn=document.createElement("button"); btn.id="emailGuestStartBtn"; btn.type="button"; btn.className="secondary email-guest-btn"; btn.textContent=tr026("회원가입 없이 시작");
+      actions?.insertAdjacentElement("beforebegin",btn); btn.onclick=()=>{modal.classList.add("hidden");startGuestMode();};
+      const all=[...modal.querySelectorAll("p,div,span")];
+      all.filter(x=>x.children.length===0 && /대문자|특수문자|8자 이상/.test(x.textContent||"")).forEach(x=>x.textContent=tr026("비밀번호는 8자 이상이면 됩니다."));
+      const signup=document.getElementById("emailSignUpBtn"); if(signup) signup.textContent=tr026("이메일로 가입");
+    }
+  }
+
+  function ensureGuestConnectDock(){
+    let dock=document.getElementById("guestConnectDock");
+    if(!isGuestMode()){ dock?.remove(); return; }
+    if(dock) return;
+    dock=document.createElement("button"); dock.id="guestConnectDock"; dock.type="button"; dock.className="guest-connect-dock sans"; dock.innerHTML=`☁️ <span>${tr026("기기 저장 중 · 계정 연결")}</span>`;
+    document.body.appendChild(dock);
+    dock.onclick=()=>document.getElementById("emailAuthBtn")?.click();
+  }
+  window.ensureGuestConnectDock=ensureGuestConnectDock;
+
+  function ensureEditionPickerModal(){
+    if(document.getElementById("editionPickerModal")) return;
+    const el=document.createElement("div"); el.id="editionPickerModal"; el.className="modal-overlay hidden";
+    el.innerHTML=`<div class="modal-box edition-picker-box"><div class="edition-picker-head"><div><h3>🖼 ${tr026("표지·판본 찾기")}</h3><p>${tr026("같은 제목의 여러 출판사·판본 중 실제 읽는 책과 같은 표지를 골라보세요.")}</p></div><button type="button" class="secondary" id="editionPickerClose">×</button></div><div class="edition-search-row"><input id="editionPickerQuery" placeholder="${tr026("책 제목·저자·ISBN")}"/><button id="editionPickerSearch" type="button">${tr026("검색")}</button></div><div id="editionPickerStatus" class="fetch-status sans"></div><div id="editionPickerResults" class="book-search-results"></div></div>`;
+    document.body.appendChild(el);
+    el.querySelector("#editionPickerClose").onclick=()=>el.classList.add("hidden");
+    el.addEventListener("click",async e=>{
+      if(e.target===el) el.classList.add("hidden");
+      const coverBtn=e.target.closest("[data-cover-only]"); const editionBtn=e.target.closest("[data-edition-apply]");
+      if(!coverBtn && !editionBtn) return;
+      const idx=Number((coverBtn||editionBtn).dataset[coverBtn?"coverOnly":"editionApply"]); const c=window.__editionCandidates?.[idx]; const b=getBook(); if(!c||!b) return;
+      if(coverBtn){ await updateBook({coverImage:c.cover||null,isbn:c.isbn||b.isbn||""}); }
+      else{ await updateBook({title:c.title||b.title,author:c.author||b.author,publisher:c.publisher||b.publisher,totalPages:c.pages||b.totalPages,coverImage:c.cover||b.coverImage,isbn:c.isbn||b.isbn||"",publishedDate:c.publishedDate||b.publishedDate||"",bookSource:c.source||"",sourceId:c.sourceId||""}); }
+      el.classList.add("hidden"); renderDetail(); showToast(tr026("표지와 판본 정보를 적용했어요."),"success");
+    });
+    const doSearch=async()=>{const q=el.querySelector("#editionPickerQuery").value.trim();const st=el.querySelector("#editionPickerStatus");if(!q)return;st.textContent=tr026("판본과 표지를 찾는 중…");try{const arr=await searchBookCandidates(q);window.__editionCandidates=arr;renderBookSearchResults(arr,"editionPickerResults","edit");st.textContent=arr.length?`${arr.length}${tr026("개의 판본을 찾았어요.")}`:tr026("검색 결과가 없어요.");}catch(err){console.error(err);st.textContent=tr026("검색에 실패했어요. 잠시 뒤 다시 시도해 주세요.");}};
+    el.querySelector("#editionPickerSearch").onclick=doSearch; el.querySelector("#editionPickerQuery").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();doSearch();}};
+  }
+  window.openEditionPickerForBook=function(book){ ensureEditionPickerModal(); const modal=document.getElementById("editionPickerModal"); modal.classList.remove("hidden"); const q=modal.querySelector("#editionPickerQuery"); q.value=[book?.title,book?.author].filter(Boolean).join(" "); modal.querySelector("#editionPickerResults").innerHTML=""; modal.querySelector("#editionPickerStatus").textContent=""; setTimeout(()=>modal.querySelector("#editionPickerSearch")?.click(),30); };
+
+  function receiptRows(){ return (data.books||[]).filter(b=>b.status==="in_progress").sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)); }
+  function renderReadingReceipt(){
+    const library=document.getElementById("library"); if(!library) return;
+    let panel=document.getElementById("readingReceipt"); const books=receiptRows();
+    if(!books.length){ panel?.remove(); return; }
+    if(!panel){ panel=document.createElement("section"); panel.id="readingReceipt"; panel.className="reading-receipt"; const stats=library.querySelector(".stats-wrap"); stats?.insertAdjacentElement("beforebegin",panel); }
+    panel.innerHTML=`<div class="receipt-tear receipt-tear-top"></div><div class="receipt-head"><span>BOOKAHOLIC / NOW READING</span><b>${tr026("읽고 있는 책")}</b><small>${todayStr()}</small></div><div class="receipt-lines">${books.map(b=>`<button type="button" class="receipt-book" data-receipt-book="${escapeAttr(b.id)}"><span class="receipt-cover">${b.coverImage?`<img src="${escapeAttr(b.coverImage)}" alt="">`:`📖`}</span><span class="receipt-book-main" data-i18n-ignore="true"><b>${escapeHtml(b.title||tr026("제목 없음"))}</b><small>${escapeHtml([b.author,b.publisher].filter(Boolean).join(" · "))}</small></span><span class="receipt-progress"><b>${pctOf(b)}%</b><small>${b.currentPage||0}/${b.totalPages||0}p</small></span></button>`).join("")}</div><div class="receipt-total"><span>${tr026("읽는 중")}</span><b>${books.length}${tr026("권")}</b></div><div class="receipt-tear receipt-tear-bottom"></div>`;
+    panel.querySelectorAll("[data-receipt-book]").forEach(btn=>btn.onclick=()=>{const card=document.querySelector(`.card[data-id="${CSS.escape(btn.dataset.receiptBook)}"]`)||btn;openBook(btn.dataset.receiptBook,card);});
+  }
+
+  function init026(){ ensureGuestAuthUi(); ensureGuestConnectDock(); ensureBookSearchUi(); ensureEditionPickerModal();
+    if(typeof renderLibrary==="function" && !window.__bookaholic026LibraryWrapped){window.__bookaholic026LibraryWrapped=true; const base=renderLibrary; renderLibrary=function(...args){const out=base(...args);requestAnimationFrame(renderReadingReceipt);return out;};}
+    document.addEventListener("click",e=>{ if(e.target.closest("#authGateEmailBtn,#emailAuthBtn")) setTimeout(ensureGuestAuthUi,0); });
+    window.addEventListener("mbo-language-change",()=>setTimeout(()=>{ensureGuestAuthUi();ensureGuestConnectDock();renderReadingReceipt();},40));
+    supabaseClient.auth.onAuthStateChange((_e,session)=>{if(session?.user) document.getElementById("guestConnectDock")?.remove(); else setTimeout(ensureGuestConnectDock,50);});
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init026,{once:true}); else init026();
 })();
