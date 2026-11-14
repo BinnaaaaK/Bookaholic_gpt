@@ -3244,7 +3244,19 @@ document
     try { return tr(text); } catch(_) { return String(text); }
   };
 
-  const BOOK_THEME_IDS=["forest","wood","rose","ocean","lavender"];
+  const BOOK_THEME_IDS=["forest","wood","rose","ocean","lavender","sand","sunset","cobalt","mint","charcoal"];
+  const BOOK_THEME_META=[
+    {id:"forest",label:"포레스트",preview:"forest"},
+    {id:"wood",label:"우드",preview:"wood"},
+    {id:"rose",label:"로즈",preview:"rose"},
+    {id:"ocean",label:"오션",preview:"ocean"},
+    {id:"lavender",label:"라벤더",preview:"lavender"},
+    {id:"sand",label:"샌드",preview:"sand"},
+    {id:"sunset",label:"선셋",preview:"sunset"},
+    {id:"cobalt",label:"코발트",preview:"cobalt"},
+    {id:"mint",label:"민트",preview:"mint"},
+    {id:"charcoal",label:"차콜",preview:"charcoal"}
+  ];
   const APPEARANCE_IDS=["system","day","night"];
 
   function getPrefs(){
@@ -3316,6 +3328,93 @@ document
     });
   }
 
+
+  function themeCardsMarkup(kind="settings"){
+    if(kind==="settings"){
+      return BOOK_THEME_META.map(t=>`<button type="button" class="theme-palette-card" data-theme-choice="${t.id}" aria-label="${uxTr(t.label)}"><span class="theme-preview theme-preview-${t.preview}"></span><b>${uxTr(t.label)}</b></button>`).join("");
+    }
+    return BOOK_THEME_META.map(t=>`<button type="button" class="theme-mini-choice" data-theme-choice="${t.id}" title="${uxTr(t.label)}" aria-label="${uxTr(t.label)}"><span class="theme-mini-swatch theme-preview-${t.preview}"></span></button>`).join("");
+  }
+
+  function refreshThemeChoiceUi(root=document){
+    const prefs=getPrefs();
+    root.querySelectorAll?.("[data-theme-choice]").forEach(btn=>{
+      const active=btn.dataset.themeChoice===prefs.theme;
+      btn.classList.toggle("active",active);
+      btn.setAttribute("aria-pressed",String(active));
+    });
+  }
+
+  function bindThemeChoices(root){
+    root?.querySelectorAll?.("[data-theme-choice]").forEach(btn=>{
+      btn.onclick=()=>{
+        savePrefs({theme:btn.dataset.themeChoice});
+        refreshThemeChoiceUi(document);
+      };
+    });
+  }
+
+  function ensurePublicThemePicker(){
+    let picker=document.getElementById("publicThemePicker");
+    if(picker) return picker;
+    picker=document.createElement("div");
+    picker.id="publicThemePicker";
+    picker.className="public-theme-picker sans hidden";
+    picker.innerHTML=`
+      <button type="button" class="public-theme-toggle" id="publicThemeToggle" aria-expanded="false" aria-haspopup="dialog">
+        <span aria-hidden="true">🎨</span><span>${uxTr("색상")}</span><span aria-hidden="true">⌄</span>
+      </button>
+      <div class="public-theme-popover hidden" id="publicThemePopover" role="dialog" aria-label="${uxTr("색상 테마")}">
+        <div class="public-theme-head"><b>${uxTr("색상 테마")}</b><small>${uxTr("원하는 분위기를 먼저 골라보세요.")}</small></div>
+        <div class="public-theme-grid">${themeCardsMarkup("mini")}</div>
+      </div>`;
+    document.body.appendChild(picker);
+    const toggle=picker.querySelector("#publicThemeToggle");
+    const pop=picker.querySelector("#publicThemePopover");
+    toggle.onclick=(e)=>{
+      e.stopPropagation();
+      const willOpen=pop.classList.contains("hidden");
+      pop.classList.toggle("hidden",!willOpen);
+      toggle.setAttribute("aria-expanded",String(willOpen));
+    };
+    pop.addEventListener("click",e=>e.stopPropagation());
+    bindThemeChoices(picker);
+    refreshThemeChoiceUi(picker);
+    if(!window.__bookaholicPublicThemeOutside){
+      window.__bookaholicPublicThemeOutside=true;
+      document.addEventListener("click",()=>{
+        const p=document.getElementById("publicThemePicker");
+        p?.querySelector("#publicThemePopover")?.classList.add("hidden");
+        p?.querySelector("#publicThemeToggle")?.setAttribute("aria-expanded","false");
+      });
+    }
+    return picker;
+  }
+
+  function setPublicThemePickerSession(session){
+    const picker=ensurePublicThemePicker();
+    picker.classList.toggle("hidden",!!session);
+  }
+
+  function ensureEmailThemePicker(){
+    const modal=document.getElementById("emailAuthModal");
+    if(!modal) return null;
+    let host=modal.querySelector("#emailThemePicker");
+    if(host) return host;
+    host=document.createElement("div");
+    host.id="emailThemePicker";
+    host.className="auth-theme-inline sans";
+    host.innerHTML=`
+      <div class="auth-theme-inline-head"><span>🎨 ${uxTr("색상")}</span><small>${uxTr("로그인 전에도 원하는 분위기로 바꿀 수 있어요.")}</small></div>
+      <div class="auth-theme-swatches">${themeCardsMarkup("mini")}</div>`;
+    const title=modal.querySelector("h1,h2,h3");
+    if(title) title.insertAdjacentElement("afterend",host);
+    else (modal.querySelector(".modal-box")||modal).prepend(host);
+    bindThemeChoices(host);
+    refreshThemeChoiceUi(host);
+    return host;
+  }
+
   function currentSessionEmail(session){
     return session?.user?.email ||
       session?.user?.user_metadata?.user_name ||
@@ -3355,6 +3454,13 @@ document
     }
   }
 
+  function closeSettingsModal(){
+    const modal=document.getElementById("uxSettingsModal");
+    if(!modal) return;
+    modal.classList.add("hidden");
+    document.body.classList.remove("ux-settings-open");
+  }
+
   function ensureSettingsModal(){
     if(document.getElementById("uxSettingsModal")) return;
     const modal=document.createElement("div");
@@ -3378,13 +3484,7 @@ document
         <div class="ux-setting-group ux-theme-setting-group">
           <label>${uxTr("색상 테마")}</label>
           <p class="ux-setting-help">${uxTr("색상 테마는 조화색 배합을 기준으로 배경·카드·버튼·강조색을 함께 바꿉니다.")}</p>
-          <div class="theme-palette-grid" id="uxThemePalette">
-            <button type="button" class="theme-palette-card" data-theme-choice="forest"><span class="theme-preview theme-preview-forest"></span><b>${uxTr("포레스트")}</b></button>
-            <button type="button" class="theme-palette-card" data-theme-choice="wood"><span class="theme-preview theme-preview-wood"></span><b>${uxTr("우드")}</b></button>
-            <button type="button" class="theme-palette-card" data-theme-choice="rose"><span class="theme-preview theme-preview-rose"></span><b>${uxTr("로즈")}</b></button>
-            <button type="button" class="theme-palette-card" data-theme-choice="ocean"><span class="theme-preview theme-preview-ocean"></span><b>${uxTr("오션")}</b></button>
-            <button type="button" class="theme-palette-card" data-theme-choice="lavender"><span class="theme-preview theme-preview-lavender"></span><b>${uxTr("라벤더")}</b></button>
-          </div>
+          <div class="theme-palette-grid" id="uxThemePalette">${themeCardsMarkup("settings")}</div>
         </div>
 
         <div class="ux-setting-group ux-appearance-setting-group">
@@ -3438,8 +3538,9 @@ document
     modal.querySelector("#uxReduceMotion").checked=!!prefs.reduceMotion;
     refreshThemeSettingUi(modal);
 
-    modal.querySelector("#uxSettingsClose").onclick=()=>modal.classList.add("hidden");
-    modal.addEventListener("click",(e)=>{ if(e.target===modal) modal.classList.add("hidden"); });
+    modal.querySelector("#uxSettingsClose").onclick=closeSettingsModal;
+    modal.addEventListener("click",(e)=>{ if(e.target===modal) closeSettingsModal(); });
+    modal.addEventListener("keydown",(e)=>{ if(e.key==="Escape") closeSettingsModal(); });
     lang.onchange=()=>window.I18N?.setLanguage?.(lang.value);
     range.oninput=()=>{ rangeVal.textContent=`${range.value}%`; savePrefs({fontScale:Number(range.value)}); };
     modal.querySelector("#uxCompactMode").onchange=(e)=>savePrefs({compact:e.target.checked});
@@ -3452,7 +3553,7 @@ document
       savePrefs({appearance:btn.dataset.appearanceChoice});
       refreshThemeSettingUi(modal);
     });
-    modal.querySelector("#uxRestartTour").onclick=()=>{ modal.classList.add("hidden"); startOnboarding(true); };
+    modal.querySelector("#uxRestartTour").onclick=()=>{ closeSettingsModal(); startOnboarding(true); };
     modal.querySelector("#uxRunQa").onclick=()=>{
       const result=window.runBookaholicQA?.() || [];
       const failed=result.filter(x=>!x.pass).length;
@@ -3472,6 +3573,8 @@ document
     if(lang) lang.value=window.I18N?.getLanguage?.() || "ko";
     refreshThemeSettingUi(modal);
     modal.classList.remove("hidden");
+    document.body.classList.add("ux-settings-open");
+    requestAnimationFrame(()=>modal.querySelector("#uxSettingsClose")?.focus());
   }
 
   function ensureAccountDock(){
@@ -4812,6 +4915,8 @@ document
     }
     ensureSaveIndicator();
     ensureSettingsModal();
+    ensurePublicThemePicker();
+    ensureEmailThemePicker();
     ensureAccountDock();
     ensureOnboardingUi();
     ensureSkipLink();
@@ -4819,8 +4924,14 @@ document
     installRuntimeWrappers();
     enhanceAccessibility(document);
 
-    supabaseClient.auth.getSession().then(({data})=>updateAccountDock(data.session));
-    supabaseClient.auth.onAuthStateChange((_event,session)=>updateAccountDock(session));
+    supabaseClient.auth.getSession().then(({data})=>{
+      updateAccountDock(data.session);
+      setPublicThemePickerSession(data.session);
+    });
+    supabaseClient.auth.onAuthStateChange((_event,session)=>{
+      updateAccountDock(session);
+      setPublicThemePickerSession(session);
+    });
 
     window.addEventListener("online",async()=>{
       setSaveState("syncing");
@@ -4832,6 +4943,11 @@ document
     window.addEventListener("mbo-language-change",()=>{
       setTimeout(()=>{
         ensureSettingsModal();
+        document.getElementById("publicThemePicker")?.remove();
+        ensurePublicThemePicker();
+        document.getElementById("emailThemePicker")?.remove();
+        ensureEmailThemePicker();
+        supabaseClient.auth.getSession().then(({data})=>setPublicThemePickerSession(data.session));
         renderReadingGoalAnalytics();
         if(currentBridgeId && !document.getElementById("bridgeScreen")?.classList.contains("hidden")){
           const r=getRoutine(currentBridgeId);
@@ -4845,10 +4961,20 @@ document
     });
 
     const observer=new MutationObserver((mutations)=>{
-      mutations.forEach(m=>m.addedNodes.forEach(n=>{ if(n.nodeType===Node.ELEMENT_NODE) enhanceAccessibility(n); }));
+      mutations.forEach(m=>m.addedNodes.forEach(n=>{
+        if(n.nodeType===Node.ELEMENT_NODE){
+          enhanceAccessibility(n);
+          if(n.id==="emailAuthModal" || n.querySelector?.("#emailAuthModal")) ensureEmailThemePicker();
+        }
+      }));
     });
     observer.observe(document.body,{childList:true,subtree:true});
 
+    window.BookaholicTheme={
+      getPrefs, savePrefs, applyPrefs,
+      themes:BOOK_THEME_META.map(x=>({...x})),
+      refresh:()=>{ applyPrefs(); refreshThemeChoiceUi(document); }
+    };
     setTimeout(()=>startOnboarding(false),700);
   }
 
