@@ -141,13 +141,23 @@ function pctOf(book){
   return Math.max(0, Math.min(100, Math.round((book.currentPage/book.totalPages)*100)));
 }
 
+function progressTone(pct){
+  if(pct >= 100) return "full";
+  if(pct >= 75) return "high";
+  if(pct >= 35) return "mid";
+  return "low";
+}
+
 function readingProgressMiniHtml(book){
   const pct = pctOf(book);
   const current = Math.max(0, Number(book.currentPage)||0);
   const total = Math.max(0, Number(book.totalPages)||0);
-  return `<div class="reading-mini-progress" data-status="${escapeAttr(book.status||"not_started")}" aria-label="${escapeAttr(`${tr("진행률")} ${pct}%`)}">
+  const tone = progressTone(pct);
+  return `<div class="reading-mini-progress" data-status="${escapeAttr(book.status||"not_started")}" data-tone="${tone}" aria-label="${escapeAttr(`${tr("진행률")} ${pct}%`)}">
     <div class="reading-mini-progress-head"><span>${tr(statusLabel(book.status))}</span><b>${pct}%</b></div>
-    <div class="reading-mini-progress-track"><span style="width:${pct}%"></span></div>
+    <div class="reading-battery reading-battery-mini" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
+      <span class="reading-battery-fill" style="width:${pct}%"></span>
+    </div>
     ${total?`<div class="reading-mini-progress-pages">${current} / ${total}p</div>`:""}
   </div>`;
 }
@@ -2005,20 +2015,123 @@ function googleCandidate(item){
     pages:Number(info.pageCount)||0, isbn, isbn13, isbn10, cover, language:info.language||""
   };
 }
+function googleBooksJsonp(query, timeoutMs=9000){
+  return new Promise((resolve,reject)=>{
+    const cb=`__bookaholicBooks_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const script=document.createElement("script");
+    const timer=setTimeout(()=>cleanup(new Error("Google Books JSONP timeout")),timeoutMs);
+    function cleanup(err,data){
+      clearTimeout(timer);
+      try{ delete window[cb]; }catch(_){ window[cb]=undefined; }
+      script.remove();
+      if(err) reject(err); else resolve(data);
+    }
+    window[cb]=(data)=>cleanup(null,data);
+    script.onerror=()=>cleanup(new Error("Google Books JSONP load failed"));
+    script.src=`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40&printType=books&orderBy=relevance&projection=full&callback=${encodeURIComponent(cb)}`;
+    document.head.appendChild(script);
+  });
+}
+
+async function googleBooksFetch(query, timeoutMs=6500){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{
+    const url=`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=40&printType=books&orderBy=relevance&projection=full`;
+    const res=await fetch(url,{signal:controller.signal,mode:"cors",cache:"no-store"});
+    if(!res.ok) throw new Error(`Google Books ${res.status}`);
+    return await res.json();
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+function openLibraryCandidate(doc){
+  const isbnList=Array.isArray(doc?.isbn)?doc.isbn:[];
+  const isbn13=isbnList.find(x=>String(x).replace(/\D/g,"").length===13)||"";
+  const isbn10=isbnList.find(x=>String(x).replace(/\D/g,"").length===10)||"";
+  const isbn=isbn13||isbn10;
+  const coverId=doc?.cover_i;
+  const cover=coverId
+    ? `https://covers.openlibrary.org/b/id/${encodeURIComponent(coverId)}-L.jpg`
+    : (isbn?`https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-L.jpg?default=false`:null);
+  const pubs=Array.isArray(doc?.publisher)?doc.publisher:[];
+  return {
+    source:"Open Library",
+    sourceId:doc?.key||"",
+    title:doc?.title||"",
+    subtitle:"",
+    author:(doc?.author_name||[]).join(", "),
+    publisher:pubs[0]||"",
+    publishedDate:doc?.first_publish_year?String(doc.first_publish_year):"",
+    pages:Number(doc?.number_of_pages_median)||0,
+    isbn,isbn13,isbn10,cover,
+    language:Array.isArray(doc?.language)?(doc.language[0]||""):""
+  };
+}
+
+async function openLibrarySearch(query, timeoutMs=7000){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{
+    const fields="key,title,author_name,publisher,first_publish_year,isbn,cover_i,number_of_pages_median,language";
+    const url=`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=30&fields=${encodeURIComponent(fields)}`;
+    const res=await fetch(url,{signal:controller.signal,mode:"cors",cache:"no-store"});
+    if(!res.ok) throw new Error(`Open Library ${res.status}`);
+    const json=await res.json();
+    return (json.docs||[]).map(openLibraryCandidate);
+  }finally{
+    clearTimeout(timer);
+  }
+}
+
+function dedupeBookCandidates(list){
+  const seen=new Set();
+  return (list||[]).filter(c=>{
+    if(!c?.title) return false;
+    const key=(c.isbn||`${c.title}|${c.publisher}|${c.publishedDate}|${c.sourceId}`).toLowerCase();
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 async function searchBookCandidates(query){
-  const raw=String(query||"").trim(); if(!raw) return [];
+  const raw=String(query||"").trim();
+  if(!raw) return [];
   const compact=raw.replace(/[\s-]/g,"");
   const q=/^(?:\d{10}|\d{13})$/.test(compact)?`isbn:${compact}`:raw;
-  const url=`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=24&printType=books&orderBy=relevance`;
-  const res=await fetch(url);
-  if(!res.ok) throw new Error(`Google Books ${res.status}`);
-  const json=await res.json();
-  const seen=new Set();
-  return (json.items||[]).map(googleCandidate).filter(c=>{
-    if(!c.title) return false;
-    const key=c.isbn||`${c.title}|${c.publisher}|${c.publishedDate}|${c.sourceId}`;
-    if(seen.has(key)) return false; seen.add(key); return true;
-  });
+
+  let googleItems=[];
+  let googleErr=null;
+
+  try{
+    const json=await googleBooksFetch(q);
+    googleItems=(json.items||[]).map(googleCandidate);
+  }catch(err){
+    googleErr=err;
+  }
+
+  if(!googleItems.length){
+    try{
+      const json=await googleBooksJsonp(q);
+      googleItems=(json.items||[]).map(googleCandidate);
+      googleErr=null;
+    }catch(err){
+      googleErr=googleErr||err;
+    }
+  }
+
+  let openItems=[];
+  try{
+    openItems=await openLibrarySearch(raw);
+  }catch(err){
+    console.warn("Open Library fallback failed",err);
+  }
+
+  const merged=dedupeBookCandidates([...googleItems,...openItems]);
+  if(!merged.length && googleErr) throw googleErr;
+  return merged.slice(0,40);
 }
 function bookCandidateMeta(c){
   return [c.author,c.publisher,c.publishedDate,c.pages?`${c.pages}쪽`:"",c.isbn?`ISBN ${c.isbn}`:""].filter(Boolean).join(" · ");
@@ -2075,7 +2188,10 @@ async function fetchBookInfo(){
     bookSearchCandidates=await searchBookCandidates(q);
     renderBookSearchResults(bookSearchCandidates,"bookSearchResults","add");
     statusEl.textContent=bookSearchCandidates.length?`${bookSearchCandidates.length}개의 판본을 찾았어요. 실제 읽는 표지를 골라주세요.`:"검색 결과가 없어요. 직접 입력해도 됩니다.";
-  }catch(e){ console.error(e); statusEl.textContent="책 정보를 가져오지 못했어요. 잠시 뒤 다시 시도하거나 직접 입력해 주세요."; }
+  }catch(e){
+    console.error("book search failed",e);
+    statusEl.textContent="표지 검색 연결에 실패했어요. 자동 우회 검색도 시도했지만 결과를 가져오지 못했습니다. 잠시 뒤 다시 검색해 주세요.";
+  }
 }
 
 async function confirmAddBook(){
@@ -2236,7 +2352,7 @@ function renderDetail(){
           <div class="meta-row"><span class="meta-label sans">옮긴이</span><input id="translatorInput" value="${escapeHtml(b.translator||"")}" placeholder="있다면 입력" /></div>
         </div>
 
-        <div class="book-reading-state">
+        <div class="book-reading-state book-reading-state-status-only">
           <div class="book-status-inline">
             <span class="sans">${tr("상태")}</span>
             <select class="status-select" id="statusSelect">
@@ -2247,20 +2363,28 @@ function renderDetail(){
               <option value="dropped" ${b.status==="dropped"?"selected":""}>중단</option>
             </select>
           </div>
+        </div>
+      </div>
+    </div>
 
-          <div class="reading-charge" data-status="${escapeAttr(b.status)}">
-            <div class="reading-charge-head"><span>${tr("진행률")}</span><strong>${pct}%</strong></div>
-            <div class="reading-charge-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span style="width:${pct}%"></span></div>
-            <div class="reading-charge-pages">
-              <input type="number" id="currentPageInput" value="${b.currentPage}" min="0" />
-              <span>/</span>
-              <input type="number" id="totalPageInput" value="${b.totalPages}" min="0" />
-              <span>${tr("페이지")}</span>
-            </div>
+    <div class="detail-section restored-progress-section">
+      <h3 class="sans">${tr("진행률")}</h3>
+      <div class="progress-row progress-row-battery">
+        <div class="detail-battery-wrap" data-tone="${progressTone(pct)}">
+          <div class="detail-battery-label"><strong>${pct}%</strong><span>${tr(statusLabel(b.status))}</span></div>
+          <div class="reading-battery reading-battery-detail" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
+            <span class="reading-battery-fill" style="width:${pct}%"></span>
           </div>
         </div>
-
-        <div class="book-edition-toolbar"><button type="button" class="secondary" id="changeBookEditionBtn">🖼 ${tr("표지·판본 찾기")}</button></div>
+        <div class="page-inputs restored-page-inputs">
+          <input type="number" id="currentPageInput" value="${b.currentPage}" min="0" />
+          <span>/</span>
+          <input type="number" id="totalPageInput" value="${b.totalPages}" min="0" />
+          <span>${tr("페이지")}</span>
+        </div>
+      </div>
+      <div class="book-edition-toolbar restored-edition-toolbar">
+        <button type="button" class="secondary" id="changeBookEditionBtn">🖼 ${tr("표지·판본 찾기")}</button>
       </div>
     </div>
 
@@ -5065,7 +5189,7 @@ document
       else{ await updateBook({title:c.title||b.title,author:c.author||b.author,publisher:c.publisher||b.publisher,totalPages:c.pages||b.totalPages,coverImage:c.cover||b.coverImage,isbn:c.isbn||b.isbn||"",publishedDate:c.publishedDate||b.publishedDate||"",bookSource:c.source||"",sourceId:c.sourceId||""}); }
       el.classList.add("hidden"); renderDetail(); showToast(tr026("표지와 판본 정보를 적용했어요."),"success");
     });
-    const doSearch=async()=>{const q=el.querySelector("#editionPickerQuery").value.trim();const st=el.querySelector("#editionPickerStatus");if(!q)return;st.textContent=tr026("판본과 표지를 찾는 중…");try{const arr=await searchBookCandidates(q);window.__editionCandidates=arr;renderBookSearchResults(arr,"editionPickerResults","edit");st.textContent=arr.length?`${arr.length}${tr026("개의 판본을 찾았어요.")}`:tr026("검색 결과가 없어요.");}catch(err){console.error(err);st.textContent=tr026("검색에 실패했어요. 잠시 뒤 다시 시도해 주세요.");}};
+    const doSearch=async()=>{const q=el.querySelector("#editionPickerQuery").value.trim();const st=el.querySelector("#editionPickerStatus");if(!q)return;st.textContent=tr026("판본과 표지를 찾는 중…");try{const arr=await searchBookCandidates(q);window.__editionCandidates=arr;renderBookSearchResults(arr,"editionPickerResults","edit");st.textContent=arr.length?`${arr.length}${tr026("개의 판본을 찾았어요.")}`:tr026("검색 결과가 없어요.");}catch(err){console.error("edition search failed",err);st.textContent=tr026("표지 검색 연결에 실패했어요. 잠시 뒤 다시 시도해 주세요.");}};
     el.querySelector("#editionPickerSearch").onclick=doSearch; el.querySelector("#editionPickerQuery").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();doSearch();}};
   }
   window.openEditionPickerForBook=function(book){ ensureEditionPickerModal(); const modal=document.getElementById("editionPickerModal"); modal.classList.remove("hidden"); const q=modal.querySelector("#editionPickerQuery"); q.value=[book?.title,book?.author].filter(Boolean).join(" "); modal.querySelector("#editionPickerResults").innerHTML=""; modal.querySelector("#editionPickerStatus").textContent=""; setTimeout(()=>modal.querySelector("#editionPickerSearch")?.click(),30); };
