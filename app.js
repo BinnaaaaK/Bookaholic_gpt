@@ -1259,6 +1259,7 @@ function barChartHtml(items){
 }
 
 let statsMonthYear = new Date().getFullYear();
+let statsReadingTimeYear = new Date().getFullYear();
 let statsWeekOffset = 0; // 0=이번 주, 1=지난주, 2=지지난주 ...
 
 function startOfWeekMonday(baseDate){
@@ -1307,6 +1308,94 @@ function buildWeekOptionLabel(offset, monday){
   }
 
   return `${tr(weekMonthLabel(monday))} · ${range}`;
+}
+
+
+function monthlyReadingMinutesForYear(year){
+  const values=Array(12).fill(0);
+  data.books.forEach(b=>(b.sessions||[]).forEach(s=>{
+    if(!s.date || String(s.date).slice(0,4)!==String(year)) return;
+    const m=parseInt(String(s.date).slice(5,7),10)-1;
+    if(m>=0 && m<12) values[m]+=Number(s.minutes)||0;
+  }));
+  return values;
+}
+
+function readingTimeTrendSvg(values){
+  const width=520,height=150,pad={l:34,r:14,t:16,b:26};
+  const hours=values.map(v=>Math.round((v/60)*10)/10);
+  const maxRaw=Math.max(0,...hours);
+  const max=Math.max(1,Math.ceil(maxRaw));
+  const x=i=>pad.l+(i/11)*(width-pad.l-pad.r);
+  const y=v=>pad.t+(max-v)/max*(height-pad.t-pad.b);
+  const points=hours.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  let grid='';
+  for(let i=0;i<=3;i++){
+    const v=max*(i/3), yy=y(v);
+    grid+=`<line x1="${pad.l}" y1="${yy}" x2="${width-pad.r}" y2="${yy}" class="reading-time-grid-line"></line>
+      <text x="${pad.l-7}" y="${yy+3}" text-anchor="end" class="reading-time-axis-label">${Math.round(v*10)/10}</text>`;
+  }
+  const dots=hours.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3.4" class="reading-time-point"><title>${i+1}${tr('월')} · ${v}${tr('시간')}</title></circle>`).join('');
+  const labels=[0,2,4,6,8,10].map(i=>`<text x="${x(i)}" y="${height-7}" text-anchor="middle" class="reading-time-axis-label">${i+1}</text>`).join('');
+  return `<svg class="reading-time-trend-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${tr('월별 독서시간 추이')}">
+    ${grid}
+    <polyline points="${points}" class="reading-time-line"></polyline>
+    ${dots}${labels}
+  </svg>`;
+}
+
+function renderReadingTimeTrendPanel(){
+  const statsYear=document.getElementById('statsYear');
+  const statsWrap=statsYear?.closest('.stats-wrap');
+  const yearPanel=statsYear?.closest('.stat-panel');
+  if(!statsWrap || !yearPanel) return;
+
+  let panel=document.getElementById('readingTimeTrendPanel');
+  if(!panel){
+    panel=document.createElement('div');
+    panel.id='readingTimeTrendPanel';
+    panel.className='stat-panel reading-time-trend-panel';
+    yearPanel.insertAdjacentElement('afterend',panel);
+  }
+
+  const years=yearsWithData();
+  if(!years.map(String).includes(String(statsReadingTimeYear))){
+    statsReadingTimeYear=parseInt(years[0],10) || new Date().getFullYear();
+  }
+  const values=monthlyReadingMinutesForYear(statsReadingTimeYear);
+  const totalMin=values.reduce((a,b)=>a+b,0);
+  const now=new Date();
+  const selectedYear=Number(statsReadingTimeYear);
+  const monthDenominator=selectedYear<now.getFullYear()?12:selectedYear===now.getFullYear()?now.getMonth()+1:0;
+  const avgHours=monthDenominator?Math.round((totalMin/60/monthDenominator)*10)/10:0;
+  const bestVal=Math.max(0,...values);
+  const bestMonth=bestVal>0?values.indexOf(bestVal)+1:null;
+
+  panel.innerHTML=`
+    <div class="stat-panel-head">
+      <div>
+        <h3>${tr('월별 독서시간 추이')} <span class="stat-unit">(${tr('시간')})</span></h3>
+        <p class="reading-time-trend-desc">${tr('한 해의 월별 독서시간 흐름을 시간 단위로 보여줘요.')}</p>
+      </div>
+      <select id="statsReadingTimeYearSelect" class="year-select sans">
+        ${years.map(y=>`<option value="${y}">${y}${tr('년')}</option>`).join('')}
+      </select>
+    </div>
+    <div class="reading-time-mini-kpis sans">
+      <span>${tr('총 독서시간')} <b>${Math.round(totalMin/60*10)/10}${tr('시간')}</b></span>
+      <span>${tr('월평균')} <b>${avgHours}${tr('시간')}</b></span>
+      <span>${tr('가장 많이 읽은 달')} <b>${bestMonth?`${bestMonth}${tr('월')}`:'—'}</b></span>
+    </div>
+    <div class="reading-time-trend-chart">
+      ${totalMin>0?readingTimeTrendSvg(values):`<div class="analytics-empty">${tr('기록이 쌓이면 월별 독서시간 추이가 보여요.')}</div>`}
+    </div>`;
+
+  const select=panel.querySelector('#statsReadingTimeYearSelect');
+  select.value=String(statsReadingTimeYear);
+  select.onchange=()=>{
+    statsReadingTimeYear=parseInt(select.value,10) || new Date().getFullYear();
+    renderReadingTimeTrendPanel();
+  };
 }
 
 function renderStats(){
@@ -1386,6 +1475,8 @@ function renderStats(){
     };
     }));
   }
+
+  renderReadingTimeTrendPanel();
 
   const genreCount = {};
   data.books.forEach(b=>(b.genres||[]).forEach(g=>{ genreCount[g] = (genreCount[g]||0)+1; }));
@@ -3153,16 +3244,21 @@ document
     try { return tr(text); } catch(_) { return String(text); }
   };
 
+  const BOOK_THEME_IDS=["forest","wood","rose","ocean","lavender"];
+  const APPEARANCE_IDS=["system","day","night"];
+
   function getPrefs(){
     try{
       return {
         fontScale: 100,
         compact: false,
         reduceMotion: false,
+        theme: "forest",
+        appearance: "system",
         ...JSON.parse(localStorage.getItem(UX_PREFS_KEY) || "{}")
       };
     }catch(_){
-      return { fontScale:100, compact:false, reduceMotion:false };
+      return { fontScale:100, compact:false, reduceMotion:false, theme:"forest", appearance:"system" };
     }
   }
 
@@ -3173,10 +3269,51 @@ document
     return prefs;
   }
 
+  function resolvedAppearance(prefs=getPrefs()){
+    if(prefs.appearance==="day" || prefs.appearance==="night") return prefs.appearance;
+    return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "night" : "day";
+  }
+
+  function syncBrowserThemeColor(){
+    requestAnimationFrame(()=>{
+      const style=getComputedStyle(document.documentElement);
+      const paper=style.getPropertyValue("--paper").trim();
+      let meta=document.querySelector('meta[name="theme-color"]');
+      if(!meta){ meta=document.createElement("meta"); meta.name="theme-color"; document.head.appendChild(meta); }
+      if(paper) meta.content=paper;
+      let scheme=document.querySelector('meta[name="color-scheme"]');
+      if(!scheme){ scheme=document.createElement("meta"); scheme.name="color-scheme"; document.head.appendChild(scheme); }
+      scheme.content=document.documentElement.dataset.appearance==="night"?"dark":"light";
+    });
+  }
+
   function applyPrefs(prefs=getPrefs()){
+    const theme=BOOK_THEME_IDS.includes(prefs.theme)?prefs.theme:"forest";
+    const appearance=APPEARANCE_IDS.includes(prefs.appearance)?prefs.appearance:"system";
+    const effective=resolvedAppearance({...prefs,appearance});
     document.documentElement.style.setProperty("--ux-font-scale", String((prefs.fontScale||100)/100));
+    document.documentElement.dataset.bookTheme=theme;
+    document.documentElement.dataset.appearance=effective;
+    document.documentElement.dataset.appearancePreference=appearance;
+    document.documentElement.style.colorScheme=effective==="night"?"dark":"light";
     document.body.classList.toggle("ux-compact", !!prefs.compact);
     document.body.classList.toggle("ux-reduce-motion", !!prefs.reduceMotion);
+    syncBrowserThemeColor();
+  }
+
+  function refreshThemeSettingUi(modal=document.getElementById("uxSettingsModal")){
+    if(!modal) return;
+    const prefs=getPrefs();
+    modal.querySelectorAll("[data-theme-choice]").forEach(btn=>{
+      const active=btn.dataset.themeChoice===prefs.theme;
+      btn.classList.toggle("active",active);
+      btn.setAttribute("aria-pressed",String(active));
+    });
+    modal.querySelectorAll("[data-appearance-choice]").forEach(btn=>{
+      const active=btn.dataset.appearanceChoice===prefs.appearance;
+      btn.classList.toggle("active",active);
+      btn.setAttribute("aria-pressed",String(active));
+    });
   }
 
   function currentSessionEmail(session){
@@ -3238,6 +3375,28 @@ document
           <select id="uxLanguageSelect" class="ux-setting-select"></select>
         </div>
 
+        <div class="ux-setting-group ux-theme-setting-group">
+          <label>${uxTr("색상 테마")}</label>
+          <p class="ux-setting-help">${uxTr("색상 테마는 조화색 배합을 기준으로 배경·카드·버튼·강조색을 함께 바꿉니다.")}</p>
+          <div class="theme-palette-grid" id="uxThemePalette">
+            <button type="button" class="theme-palette-card" data-theme-choice="forest"><span class="theme-preview theme-preview-forest"></span><b>${uxTr("포레스트")}</b></button>
+            <button type="button" class="theme-palette-card" data-theme-choice="wood"><span class="theme-preview theme-preview-wood"></span><b>${uxTr("우드")}</b></button>
+            <button type="button" class="theme-palette-card" data-theme-choice="rose"><span class="theme-preview theme-preview-rose"></span><b>${uxTr("로즈")}</b></button>
+            <button type="button" class="theme-palette-card" data-theme-choice="ocean"><span class="theme-preview theme-preview-ocean"></span><b>${uxTr("오션")}</b></button>
+            <button type="button" class="theme-palette-card" data-theme-choice="lavender"><span class="theme-preview theme-preview-lavender"></span><b>${uxTr("라벤더")}</b></button>
+          </div>
+        </div>
+
+        <div class="ux-setting-group ux-appearance-setting-group">
+          <label>${uxTr("화면 모드")}</label>
+          <div class="appearance-choice-row" role="group" aria-label="${uxTr("화면 모드")}">
+            <button type="button" data-appearance-choice="system">${uxTr("자동")}</button>
+            <button type="button" data-appearance-choice="day">Day</button>
+            <button type="button" data-appearance-choice="night">Night</button>
+          </div>
+          <p class="ux-setting-help">${uxTr("자동 모드는 기기의 라이트/다크 설정을 따라갑니다.")}</p>
+        </div>
+
         <div class="ux-setting-group">
           <div class="ux-setting-row">
             <label for="uxFontScale">${uxTr("글자 크기")}</label>
@@ -3277,6 +3436,7 @@ document
     rangeVal.textContent=`${range.value}%`;
     modal.querySelector("#uxCompactMode").checked=!!prefs.compact;
     modal.querySelector("#uxReduceMotion").checked=!!prefs.reduceMotion;
+    refreshThemeSettingUi(modal);
 
     modal.querySelector("#uxSettingsClose").onclick=()=>modal.classList.add("hidden");
     modal.addEventListener("click",(e)=>{ if(e.target===modal) modal.classList.add("hidden"); });
@@ -3284,6 +3444,14 @@ document
     range.oninput=()=>{ rangeVal.textContent=`${range.value}%`; savePrefs({fontScale:Number(range.value)}); };
     modal.querySelector("#uxCompactMode").onchange=(e)=>savePrefs({compact:e.target.checked});
     modal.querySelector("#uxReduceMotion").onchange=(e)=>savePrefs({reduceMotion:e.target.checked});
+    modal.querySelectorAll("[data-theme-choice]").forEach(btn=>btn.onclick=()=>{
+      savePrefs({theme:btn.dataset.themeChoice});
+      refreshThemeSettingUi(modal);
+    });
+    modal.querySelectorAll("[data-appearance-choice]").forEach(btn=>btn.onclick=()=>{
+      savePrefs({appearance:btn.dataset.appearanceChoice});
+      refreshThemeSettingUi(modal);
+    });
     modal.querySelector("#uxRestartTour").onclick=()=>{ modal.classList.add("hidden"); startOnboarding(true); };
     modal.querySelector("#uxRunQa").onclick=()=>{
       const result=window.runBookaholicQA?.() || [];
@@ -3302,6 +3470,7 @@ document
     const modal=document.getElementById("uxSettingsModal");
     const lang=modal.querySelector("#uxLanguageSelect");
     if(lang) lang.value=window.I18N?.getLanguage?.() || "ko";
+    refreshThemeSettingUi(modal);
     modal.classList.remove("hidden");
   }
 
@@ -4224,6 +4393,7 @@ document
       {target:"#library .lib-header",title:guideT("libraryIntroTitle"),body:guideT("libraryIntroBody"),raw:true},
       {target:"#library .contrib-wrap",title:guideT("libraryGridTitle"),body:guideT("libraryGridBody"),raw:true},
       {target:"#library .stats-wrap",title:guideT("libraryStatsTitle"),body:guideT("libraryStatsBody"),raw:true},
+      {target:"#readingTimeTrendPanel",title:uxTr("월별 독서시간 추이"),body:uxTr("한 해의 월별 독서시간 흐름을 시간 단위로 보여줘요."),raw:true},
       {target:"#readingGoalAnalytics",title:guideT("libraryGoalTitle"),body:guideT("libraryGoalBody"),raw:true},
       {target:"#readingGoalAnalytics .secondary-trend-block",title:guideT("lineChartTitle"),body:guideT("lineChartBody"),raw:true},
       {target:"#library .toolbar:not(.share-toolbar)",title:guideT("libraryFilterTitle"),body:guideT("libraryFilterBody"),raw:true},
@@ -4633,6 +4803,13 @@ document
 
   function initUxSuite(){
     applyPrefs();
+    if(!window.__bookaholicThemeSchemeListener){
+      window.__bookaholicThemeSchemeListener=true;
+      const media=window.matchMedia?.("(prefers-color-scheme: dark)");
+      const onSchemeChange=()=>{ if(getPrefs().appearance==="system") applyPrefs(); };
+      media?.addEventListener?.("change",onSchemeChange);
+      media?.addListener?.(onSchemeChange);
+    }
     ensureSaveIndicator();
     ensureSettingsModal();
     ensureAccountDock();
