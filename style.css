@@ -3510,3 +3510,304 @@ body.ux-settings-open{
   .ux-settings-modal .theme-palette-grid,
   .theme-palette-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
+
+
+/* ==========================================================================\n   030 — Cover-first book design + charge-style reading progress\n   The book cover is the primary visual; progress becomes a compact horizontal gauge.\n   ========================================================================== */
+
+/* The receipt experiment is intentionally removed. */
+#readingReceipt{ display:none !important; }
+
+/* Library cards: show the real cover, never a progress ring over it. */
+.grid{
+  grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
+  gap:18px;
+}
+.card-cover{
+  aspect-ratio:2 / 3;
+  background:linear-gradient(145deg,var(--paper-dim),var(--card));
+  border-bottom:1px solid var(--line);
+}
+.card-cover .cover-img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  padding:10px;
+  box-sizing:border-box;
+  filter:drop-shadow(0 10px 18px rgba(0,0,0,.22));
+}
+.card-cover .ring-badge,
+.card-cover .mini-ring{ display:none !important; }
+.cover-placeholder{
+  width:100%;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  color:var(--ink-soft);
+  background:linear-gradient(145deg,var(--paper-dim),var(--card));
+}
+.cover-placeholder>span{ font-size:34px; opacity:.72; }
+.cover-placeholder>small{ font-size:10.5px; font-family:"Avenir Next","Segoe UI",sans-serif; }
+
+/* Compact progress "charge" on library/board cards. */
+.reading-mini-progress{
+  margin:8px 0 9px;
+  padding:8px 9px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--paper-dim);
+}
+.reading-mini-progress-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:6px;
+  color:var(--ink-soft);
+  font:600 10.5px/1.2 "Avenir Next","Segoe UI",sans-serif;
+}
+.reading-mini-progress-head b{ color:var(--ink); font-size:11.5px; }
+.reading-mini-progress-track{
+  height:7px;
+  border-radius:999px;
+  background:var(--paper);
+  border:1px solid var(--line);
+  overflow:hidden;
+}
+.reading-mini-progress-track>span{
+  display:block;
+  height:100%;
+  min-width:0;
+  border-radius:inherit;
+  background:linear-gradient(90deg,var(--cloth),var(--blue));
+  transition:width .25s ease;
+}
+.reading-mini-progress[data-status="done"] .reading-mini-progress-track>span{
+  background:linear-gradient(90deg,var(--cloth),var(--gold));
+}
+.reading-mini-progress-pages{
+  margin-top:5px;
+  text-align:right;
+  color:var(--ink-soft);
+  font:500 9.5px/1.2 "Avenir Next","Segoe UI",sans-serif;
+}
+
+/* Board view gets the same cover-first language. */
+.board-card{
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr);
+  gap:10px;
+  align-items:start;
+  padding:9px;
+}
+.board-card-cover{
+  width:42px;
+  aspect-ratio:2 / 3;
+  border-radius:5px;
+  overflow:hidden;
+  display:grid;
+  place-items:center;
+  background:var(--paper-dim);
+  border:1px solid var(--line);
+}
+.board-card-cover img{ width:100%; height:100%; object-fit:cover; }
+.board-card-cover span{ font-size:18px; }
+.board-card-main{ min-width:0; }
+.board-card .bc-title{ margin-bottom:4px; }
+.board-card .reading-mini-progress{ margin:5px 0 0; padding:6px; }
+.board-card .reading-mini-progress-pages{ display:none; }
+
+/* Detail: give the real cover the visual priority. */
+#overlay-inner{ max-width:840px; }
+.detail-top{ margin-bottom:12px; }
+.book-detail-hero{
+  display:grid;
+  grid-template-columns:minmax(150px,190px) minmax(0,1fr);
+  gap:28px;
+  align-items:start;
+  margin:20px 0 24px;
+}
+.detail-cover-column{ min-width:0; }
+.detail-cover-shell{
+  position:relative;
+  width:100%;
+  aspect-ratio:2 / 3;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  border-radius:12px;
+  border:1px solid var(--line-strong);
+  background:linear-gradient(145deg,var(--paper-dim),var(--card));
+  padding:0;
+  cursor:pointer;
+  box-shadow:0 14px 34px rgba(0,0,0,.2);
+}
+.detail-cover-shell:hover{ border-color:var(--cloth); transform:translateY(-1px); }
+.detail-cover-img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  padding:8px;
+  box-sizing:border-box;
+  background:var(--paper-dim);
+}
+.detail-cover-placeholder{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  color:var(--ink-soft);
+  padding:18px;
+  text-align:center;
+}
+.detail-cover-placeholder b{ font-size:40px; }
+.detail-cover-placeholder small{ font-size:11px; line-height:1.45; }
+.detail-cover-edit-chip{
+  position:absolute;
+  left:10px;
+  right:10px;
+  bottom:10px;
+  padding:7px 9px;
+  border-radius:8px;
+  background:rgba(10,15,20,.78);
+  color:#fff;
+  font:700 10.5px/1.2 "Avenir Next","Segoe UI",sans-serif;
+  opacity:0;
+  transform:translateY(4px);
+  transition:opacity .18s ease,transform .18s ease;
+}
+.detail-cover-shell:hover .detail-cover-edit-chip,
+.detail-cover-shell:focus-visible .detail-cover-edit-chip,
+.detail-cover-shell.no-cover .detail-cover-edit-chip{
+  opacity:1;
+  transform:none;
+}
+.detail-isbn{
+  margin-top:8px;
+  color:var(--ink-soft);
+  font-size:9.5px;
+  text-align:center;
+  overflow-wrap:anywhere;
+}
+.detail-book-info{ min-width:0; }
+.detail-book-info .book-title-input{
+  font-size:30px;
+  line-height:1.25;
+  margin:2px 0 12px;
+}
+.detail-book-info .book-meta-edit{ margin-bottom:12px; }
+.book-reading-state{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:12px;
+  align-items:stretch;
+  margin:12px 0;
+}
+.book-status-inline{
+  min-width:118px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--paper-dim);
+}
+.book-status-inline>span{
+  color:var(--ink-soft);
+  font-size:10px;
+  font-weight:700;
+}
+.book-status-inline .status-select{ width:100%; }
+
+/* The recommended progress UI: a capsule/charge bar, not another dominant circle. */
+.reading-charge{
+  min-width:0;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--paper-dim);
+}
+.reading-charge-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+  color:var(--ink-soft);
+  font:600 10.5px/1.2 "Avenir Next","Segoe UI",sans-serif;
+}
+.reading-charge-head strong{
+  color:var(--ink);
+  font-size:16px;
+  font-family:inherit;
+}
+.reading-charge-track{
+  height:12px;
+  border:1px solid var(--line-strong);
+  border-radius:999px;
+  overflow:hidden;
+  background:var(--paper);
+  padding:2px;
+}
+.reading-charge-track>span{
+  display:block;
+  height:100%;
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--cloth),var(--blue));
+  transition:width .25s ease;
+}
+.reading-charge[data-status="done"] .reading-charge-track>span{
+  background:linear-gradient(90deg,var(--cloth),var(--gold));
+}
+.reading-charge-pages{
+  margin-top:9px;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
+  color:var(--ink-soft);
+  font-size:11px;
+}
+.reading-charge-pages input{
+  width:58px;
+  text-align:center;
+  padding:6px 4px;
+  border:1px solid var(--line);
+  border-radius:7px;
+  background:var(--card);
+  color:var(--ink);
+  font:600 12px/1 "Avenir Next","Segoe UI",sans-serif;
+}
+.detail-book-info .book-edition-toolbar{
+  margin-top:10px;
+  justify-content:flex-start;
+}
+.reading-plan-section{ margin-top:4px; }
+
+@media(max-width:700px){
+  #overlay-inner{ max-width:none; padding-left:16px; padding-right:16px; }
+  .book-detail-hero{
+    grid-template-columns:118px minmax(0,1fr);
+    gap:16px;
+  }
+  .detail-book-info .book-title-input{ font-size:24px; }
+  .book-reading-state{ grid-template-columns:1fr; }
+  .book-status-inline{ min-width:0; }
+}
+@media(max-width:500px){
+  .book-detail-hero{
+    grid-template-columns:1fr;
+  }
+  .detail-cover-column{
+    width:min(160px,48vw);
+    margin:0 auto;
+  }
+  .detail-cover-edit-chip{ opacity:1; transform:none; }
+  .meta-dates{ flex-direction:column; }
+  .grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }
+  .card-body{ padding:10px; }
+}
