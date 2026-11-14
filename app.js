@@ -141,6 +141,17 @@ function pctOf(book){
   return Math.max(0, Math.min(100, Math.round((book.currentPage/book.totalPages)*100)));
 }
 
+function readingProgressMiniHtml(book){
+  const pct = pctOf(book);
+  const current = Math.max(0, Number(book.currentPage)||0);
+  const total = Math.max(0, Number(book.totalPages)||0);
+  return `<div class="reading-mini-progress" data-status="${escapeAttr(book.status||"not_started")}" aria-label="${escapeAttr(`${tr("진행률")} ${pct}%`)}">
+    <div class="reading-mini-progress-head"><span>${tr(statusLabel(book.status))}</span><b>${pct}%</b></div>
+    <div class="reading-mini-progress-track"><span style="width:${pct}%"></span></div>
+    ${total?`<div class="reading-mini-progress-pages">${current} / ${total}p</div>`:""}
+  </div>`;
+}
+
 const ROUTINE_DEFS = [
   { id:"qt", name:"큐티", icon:"🙏", kind:"check" },
   { id:"diary", name:"일기", icon:"📔", kind:"note" },
@@ -1572,9 +1583,8 @@ function renderLibrary(){
         : `${b.startDate ? fmtDate(b.startDate) : "시작 전"}${b.endDate ? " → "+fmtDate(b.endDate) : ""}`;
       const statusColor = STATUS_COLORS[b.status] || STATUS_COLORS.not_started;
       const coverInner = b.coverImage
-        ? `<img class="cover-img" src="${b.coverImage}" alt="" />
-           <span class="ring-badge">${ringSvg(pct, 40, 4, "rgba(255,255,255,0.35)", "#ffffff", "#ffffff")}</span>`
-        : ringSvg(pct, 64, 6, "rgba(255,255,255,0.25)", "#ffffff", "#ffffff");
+        ? `<img class="cover-img" src="${escapeAttr(b.coverImage)}" alt="${escapeAttr(b.title||tr("책 표지"))}" loading="lazy" />`
+        : `<div class="cover-placeholder"><span>📖</span><small>${tr("표지·판본 찾기")}</small></div>`;
       html += `
         <div class="card" data-id="${b.id}">
           <div class="card-cover" style="background:${statusColor}">
@@ -1588,6 +1598,7 @@ function renderLibrary(){
               <span class="pill pill-${b.status}">${statusLabel(b.status)}</span>
               ${b.rating ? `<span class="stars-mini">${starsHtml(b.rating)}</span>` : ""}
             </div>
+            ${readingProgressMiniHtml(b)}
             ${(b.genres&&b.genres.length) ? `<div class="genre-tags">${b.genres.slice(0,3).map(g=>`<span class="genre-tag">${escapeHtml(g)}</span>`).join("")}</div>` : ""}
             <div class="card-bottom sans">${bottomLine}</div>
           </div>
@@ -1631,8 +1642,11 @@ function renderLibrary(){
       html += `<div class="board-col"><h4>${col.label} · ${items.length}</h4>`;
       items.forEach(b=>{
         html += `<div class="board-card" data-id="${b.id}">
-          <div class="bc-title">${escapeHtml(b.title||"제목 없음")}</div>
-          <div class="bc-pct">${pctOf(b)}%</div>
+          <div class="board-card-cover">${b.coverImage?`<img src="${escapeAttr(b.coverImage)}" alt="${escapeAttr(b.title||"")}" loading="lazy">`:`<span>📖</span>`}</div>
+          <div class="board-card-main">
+            <div class="bc-title">${escapeHtml(b.title||"제목 없음")}</div>
+            ${readingProgressMiniHtml(b)}
+          </div>
         </div>`;
       });
       html += `</div>`;
@@ -2172,8 +2186,6 @@ function renderDetail(){
   const b = getBook();
   if(!b) return;
   const pct = pctOf(b);
-  const circumference = 2*Math.PI*30;
-  const dash = circumference * (pct/100);
 
   const totalMinutes = b.sessions.reduce((a,s)=>a+s.minutes,0);
   const totalMinutesStr = totalMinutes >= 60 ? `${Math.floor(totalMinutes/60)}시간 ${totalMinutes%60}분` : `${totalMinutes}분`;
@@ -2197,13 +2209,6 @@ function renderDetail(){
         <button class="back-btn sans" id="backBtn">← 서재로</button>
         <button class="back-btn sans mbo-main-shortcut" id="bookMboHomeBtn">← MBO 메인</button>
       </div>
-      <select class="status-select" id="statusSelect">
-        <option value="wishlist" ${b.status==="wishlist"?"selected":""}>읽고 싶음</option>
-        <option value="not_started" ${b.status==="not_started"?"selected":""}>시작 전</option>
-        <option value="in_progress" ${b.status==="in_progress"?"selected":""}>읽는 중</option>
-        <option value="done" ${b.status==="done"?"selected":""}>완료</option>
-        <option value="dropped" ${b.status==="dropped"?"selected":""}>중단</option>
-      </select>
     </div>
 
     <label class="visibility-switch">
@@ -2212,13 +2217,53 @@ function renderDetail(){
       <span class="vs-label sans">${b.isPublic ? "🌐 공개 중 — 친구가 공유 링크에서 볼 수 있어요" : "🔒 비공개 — 나만 볼 수 있어요"}</span>
     </label>
 
-    <input class="book-title-input" id="titleInput" value="${escapeHtml(b.title)}" />
-    <div class="book-meta-edit">
-      <div class="meta-row"><span class="meta-label sans">작가</span><input id="authorInput" value="${escapeHtml(b.author||"")}" placeholder="입력해 주세요" /></div>
-      <div class="meta-row"><span class="meta-label sans">출판사</span><input id="publisherInput" value="${escapeHtml(b.publisher||"")}" placeholder="입력해 주세요" /></div>
-      <div class="meta-row"><span class="meta-label sans">옮긴이</span><input id="translatorInput" value="${escapeHtml(b.translator||"")}" placeholder="있다면 입력" /></div>
+    <div class="book-detail-hero">
+      <div class="detail-cover-column">
+        <button type="button" class="detail-cover-shell ${b.coverImage?"has-cover":"no-cover"}" id="detailCoverButton" title="${escapeAttr(tr("표지·판본 찾기"))}">
+          ${b.coverImage
+            ? `<img class="detail-cover-img" src="${escapeAttr(b.coverImage)}" alt="${escapeAttr(b.title||tr("책 표지"))}" />`
+            : `<span class="detail-cover-placeholder"><b>📖</b><small>${tr("표지·판본 찾기")}</small></span>`}
+          <span class="detail-cover-edit-chip">🖼 ${tr("표지·판본 찾기")}</span>
+        </button>
+        ${b.isbn?`<div class="detail-isbn sans">ISBN ${escapeHtml(b.isbn)}</div>`:""}
+      </div>
+
+      <div class="detail-book-info">
+        <input class="book-title-input" id="titleInput" value="${escapeHtml(b.title)}" />
+        <div class="book-meta-edit">
+          <div class="meta-row"><span class="meta-label sans">작가</span><input id="authorInput" value="${escapeHtml(b.author||"")}" placeholder="입력해 주세요" /></div>
+          <div class="meta-row"><span class="meta-label sans">출판사</span><input id="publisherInput" value="${escapeHtml(b.publisher||"")}" placeholder="입력해 주세요" /></div>
+          <div class="meta-row"><span class="meta-label sans">옮긴이</span><input id="translatorInput" value="${escapeHtml(b.translator||"")}" placeholder="있다면 입력" /></div>
+        </div>
+
+        <div class="book-reading-state">
+          <div class="book-status-inline">
+            <span class="sans">${tr("상태")}</span>
+            <select class="status-select" id="statusSelect">
+              <option value="wishlist" ${b.status==="wishlist"?"selected":""}>읽고 싶음</option>
+              <option value="not_started" ${b.status==="not_started"?"selected":""}>시작 전</option>
+              <option value="in_progress" ${b.status==="in_progress"?"selected":""}>읽는 중</option>
+              <option value="done" ${b.status==="done"?"selected":""}>완료</option>
+              <option value="dropped" ${b.status==="dropped"?"selected":""}>중단</option>
+            </select>
+          </div>
+
+          <div class="reading-charge" data-status="${escapeAttr(b.status)}">
+            <div class="reading-charge-head"><span>${tr("진행률")}</span><strong>${pct}%</strong></div>
+            <div class="reading-charge-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span style="width:${pct}%"></span></div>
+            <div class="reading-charge-pages">
+              <input type="number" id="currentPageInput" value="${b.currentPage}" min="0" />
+              <span>/</span>
+              <input type="number" id="totalPageInput" value="${b.totalPages}" min="0" />
+              <span>${tr("페이지")}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="book-edition-toolbar"><button type="button" class="secondary" id="changeBookEditionBtn">🖼 ${tr("표지·판본 찾기")}</button></div>
+      </div>
     </div>
-    <div class="book-edition-toolbar"><button type="button" class="secondary" id="changeBookEditionBtn">🖼 표지·판본 찾기</button>${b.isbn?`<span class="sans">ISBN ${escapeHtml(b.isbn)}</span>`:""}</div>
+
     <div class="meta-dates">
       <div class="meta-date-chip ${b.startDate?"filled":""}">
         <span class="mdc-label sans">시작일 (눌러서 변경)</span>
@@ -2230,22 +2275,7 @@ function renderDetail(){
       </div>
     </div>
 
-    <div class="detail-section">
-      <h3 class="sans">진행률</h3>
-      <div class="progress-row">
-        <div class="ring-wrap">
-          <svg width="74" height="74">
-            <circle cx="37" cy="37" r="30" stroke="var(--paper-dim)" stroke-width="7" fill="none"/>
-            <circle cx="37" cy="37" r="30" stroke="var(--cloth)" stroke-width="7" fill="none"
-              stroke-dasharray="${circumference}" stroke-dashoffset="${circumference-dash}" stroke-linecap="round"/>
-          </svg>
-          <div class="ring-pct">${pct}%</div>
-        </div>
-        <div class="page-inputs">
-          <input type="number" id="currentPageInput" value="${b.currentPage}" min="0" /> /
-          <input type="number" id="totalPageInput" value="${b.totalPages}" min="0" /> 페이지
-        </div>
-      </div>
+    <div class="detail-section reading-plan-section">
       <div class="finish-row sans">
         <div class="fr-item">
           <span class="fr-label">완독 예상일</span>
@@ -2389,6 +2419,7 @@ function renderDetail(){
     await updateBook({ translator: e.target.value.trim() });
   });
   document.getElementById("changeBookEditionBtn")?.addEventListener("click",()=>openEditionPickerForBook(b));
+  document.getElementById("detailCoverButton")?.addEventListener("click",()=>openEditionPickerForBook(b));
 
   document.getElementById("currentPageInput").addEventListener("change", async (e)=>{
     const cp = Math.max(0, Math.min(b.totalPages || Number.MAX_SAFE_INTEGER, parseInt(e.target.value)||0));
@@ -5050,9 +5081,9 @@ document
   }
 
   function init026(){ ensureGuestAuthUi(); ensureGuestConnectDock(); ensureBookSearchUi(); ensureEditionPickerModal();
-    if(typeof renderLibrary==="function" && !window.__bookaholic026LibraryWrapped){window.__bookaholic026LibraryWrapped=true; const base=renderLibrary; renderLibrary=function(...args){const out=base(...args);requestAnimationFrame(renderReadingReceipt);return out;};}
+    document.getElementById("readingReceipt")?.remove();
     document.addEventListener("click",e=>{ if(e.target.closest("#authGateEmailBtn,#emailAuthBtn")) setTimeout(ensureGuestAuthUi,0); });
-    window.addEventListener("mbo-language-change",()=>setTimeout(()=>{ensureGuestAuthUi();ensureGuestConnectDock();renderReadingReceipt();},40));
+    window.addEventListener("mbo-language-change",()=>setTimeout(()=>{ensureGuestAuthUi();ensureGuestConnectDock();document.getElementById("readingReceipt")?.remove();},40));
     supabaseClient.auth.onAuthStateChange((_e,session)=>{if(session?.user) document.getElementById("guestConnectDock")?.remove(); else setTimeout(ensureGuestConnectDock,50);});
   }
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init026,{once:true}); else init026();
