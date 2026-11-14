@@ -1196,6 +1196,29 @@ function auditUntranslatedKoreanUI() {
     "자동 모드는 기기의 라이트/다크 설정을 따라갑니다.":"自動モードは端末のライト/ダーク設定に従います。"
   });
 
+
+  // ---------- Bookaholic 029: expanded pre-login color themes ----------
+  Object.assign(EN, {
+    "색상":"Color","원하는 분위기를 먼저 골라보세요.":"Choose a look you like before you begin.",
+    "로그인 전에도 원하는 분위기로 바꿀 수 있어요.":"You can change the look before signing in.",
+    "샌드":"Sand","선셋":"Sunset","코발트":"Cobalt","민트":"Mint","차콜":"Charcoal"
+  });
+  Object.assign(PACKS["zh-CN"], {
+    "색상":"配色","원하는 분위기를 먼저 골라보세요.":"开始前先选择喜欢的氛围。",
+    "로그인 전에도 원하는 분위기로 바꿀 수 있어요.":"登录前也可以更改配色。",
+    "샌드":"沙色","선셋":"落日","코발트":"钴蓝","민트":"薄荷","차콜":"炭灰"
+  });
+  Object.assign(PACKS["zh-TW"], {
+    "색상":"配色","원하는 분위기를 먼저 골라보세요.":"開始前先選擇喜歡的氛圍。",
+    "로그인 전에도 원하는 분위기로 바꿀 수 있어요.":"登入前也可以更改配色。",
+    "샌드":"沙色","선셋":"夕陽","코발트":"鈷藍","민트":"薄荷","차콜":"炭灰"
+  });
+  Object.assign(PACKS.ja, {
+    "색상":"カラー","원하는 분위기를 먼저 골라보세요.":"始める前に好きな雰囲気を選べます。",
+    "로그인 전에도 원하는 분위기로 바꿀 수 있어요.":"ログイン前でも配色を変更できます。",
+    "샌드":"サンド","선셋":"サンセット","코발트":"コバルト","민트":"ミント","차콜":"チャコール"
+  });
+
   function installDialogTranslation(){
     if(window.__mboDialogsLocalized) return;
     window.__mboDialogsLocalized=true;
