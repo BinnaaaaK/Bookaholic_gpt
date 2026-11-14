@@ -1117,6 +1117,51 @@ function auditUntranslatedKoreanUI() {
 
   return results;
 }
+  // ---------- Bookaholic 026: easier entry + book cover / edition search ----------
+  Object.assign(EN, {
+    "회원가입 없이 바로 시작":"Start without signing up",
+    "이 기기에 자동 저장됩니다. 나중에 계정을 연결하면 기록을 이어갈 수 있어요.":"Your records are saved automatically on this device. Connect an account later to keep them across devices.",
+    "회원가입 없이 시작":"Continue without signing up","기기 저장 중 · 계정 연결":"Saved on device · Connect account","이메일로 가입":"Sign up with email",
+    "비밀번호는 8자 이상이면 됩니다.":"Use at least 8 characters.","표지·판본 찾기":"Find cover & edition",
+    "같은 제목의 여러 출판사·판본 중 실제 읽는 책과 같은 표지를 골라보세요.":"Choose the cover and edition that matches the physical book you are actually reading.",
+    "책 제목·저자·ISBN":"Book title, author, or ISBN","검색":"Search","표지만":"Cover only","이 판본":"Use edition","이 판본 선택":"Choose this edition",
+    "선택한 판본":"Selected edition","판본 정보 없음":"No edition details","책 제목·저자 또는 ISBN을 입력해 주세요.":"Enter a book title, author, or ISBN.",
+    "판본과 표지를 찾는 중…":"Searching editions and covers…","검색 결과가 없어요. 직접 입력해도 됩니다.":"No results. You can enter the details manually.",
+    "책 정보를 가져오지 못했어요. 잠시 뒤 다시 시도하거나 직접 입력해 주세요.":"Could not load book information. Try again later or enter it manually.",
+    "선택한 판본의 제목·저자·출판사·페이지·표지를 적용했어요. 아래에서 수정할 수 있어요.":"Applied the selected edition's title, author, publisher, pages, and cover. You can edit them below.",
+    "표지와 판본 정보를 적용했어요.":"Cover and edition applied.","개의 판본을 찾았어요.":" editions found.","검색 결과가 없어요.":"No results found.",
+    "검색에 실패했어요. 잠시 뒤 다시 시도해 주세요.":"Search failed. Please try again shortly.","읽고 있는 책":"Now reading",
+    "인증 메일 발송 한도에 도달했어요. 비밀번호 문제는 아니에요. 잠시 후 다시 시도하거나 ‘회원가입 없이 시작’을 이용해 주세요.":"The confirmation-email limit has been reached. Your password is not the problem. Try again later or continue without signing up.",
+    "이메일과 비밀번호만 입력하면 바로 가입할 수 있어요.":"Enter just your email and password to sign up.","가입 요청 중…":"Creating your account…",
+    "가입 요청 완료! 받은 메일의 인증 링크를 한 번만 눌러 주세요.":"Almost done! Open the confirmation email and tap the link once.",
+    "회원가입 없이 시작했어요. 기록은 이 기기에 자동 저장됩니다.":"You're in without an account. Records are saved automatically on this device.",
+    "체험 중 기록을 새 계정으로 이어왔어요.":"Your guest records were carried into the new account."
+  });
+  Object.assign(PACKS["zh-CN"], {
+    "회원가입 없이 바로 시작":"无需注册，立即开始","이 기기에 자동 저장됩니다. 나중에 계정을 연결하면 기록을 이어갈 수 있어요.":"记录会自动保存在此设备上，之后连接账户即可继续使用。",
+    "회원가입 없이 시작":"无需注册继续","기기 저장 중 · 계정 연결":"已保存到设备 · 连接账户","이메일로 가입":"使用邮箱注册","비밀번호는 8자 이상이면 됩니다.":"密码至少 8 个字符即可。",
+    "표지·판본 찾기":"查找封面与版本","같은 제목의 여러 출판사·판본 중 실제 읽는 책과 같은 표지를 골라보세요.":"从同名书的不同出版社与版本中选择与你正在阅读的实体书相同的封面。",
+    "책 제목·저자·ISBN":"书名、作者或 ISBN","검색":"搜索","표지만":"仅封面","이 판본":"使用此版本","이 판본 선택":"选择此版本","선택한 판본":"已选版本","판본 정보 없음":"无版本信息",
+    "책 제목·저자 또는 ISBN을 입력해 주세요.":"请输入书名、作者或 ISBN。","판본과 표지를 찾는 중…":"正在查找版本和封面…","검색 결과가 없어요. 직접 입력해도 됩니다.":"没有搜索结果，也可以手动输入。",
+    "표지와 판본 정보를 적용했어요.":"已应用封面和版本信息。","개의 판본을 찾았어요.":" 个版本已找到。","검색 결과가 없어요.":"没有搜索结果。","검색에 실패했어요. 잠시 뒤 다시 시도해 주세요.":"搜索失败，请稍后重试。","읽고 있는 책":"正在阅读"
+  });
+  Object.assign(PACKS["zh-TW"], {
+    "회원가입 없이 바로 시작":"無需註冊，立即開始","이 기기에 자동 저장됩니다. 나중에 계정을 연결하면 기록을 이어갈 수 있어요.":"紀錄會自動儲存在此裝置，之後連結帳戶即可延續使用。",
+    "회원가입 없이 시작":"無需註冊繼續","기기 저장 중 · 계정 연결":"已儲存於裝置 · 連結帳戶","이메일로 가입":"使用電子郵件註冊","비밀번호는 8자 이상이면 됩니다.":"密碼至少 8 個字元即可。",
+    "표지·판본 찾기":"尋找封面與版本","같은 제목의 여러 출판사·판본 중 실제 읽는 책과 같은 표지를 골라보세요.":"從同名書的不同出版社與版本中選擇與你實際閱讀的書相同的封面。",
+    "책 제목·저자·ISBN":"書名、作者或 ISBN","검색":"搜尋","표지만":"僅封面","이 판본":"使用此版本","이 판본 선택":"選擇此版本","선택한 판본":"已選版本","판본 정보 없음":"無版本資訊",
+    "책 제목·저자 또는 ISBN을 입력해 주세요.":"請輸入書名、作者或 ISBN。","판본과 표지를 찾는 중…":"正在尋找版本與封面…","검색 결과가 없어요. 직접 입력해도 됩니다.":"沒有搜尋結果，也可以手動輸入。",
+    "표지와 판본 정보를 적용했어요.":"已套用封面與版本資訊。","개의 판본을 찾았어요.":" 個版本已找到。","검색 결과가 없어요.":"沒有搜尋結果。","검색에 실패했어요. 잠시 뒤 다시 시도해 주세요.":"搜尋失敗，請稍後再試。","읽고 있는 책":"正在閱讀"
+  });
+  Object.assign(PACKS.ja, {
+    "회원가입 없이 바로 시작":"登録せずにすぐ始める","이 기기에 자동 저장됩니다. 나중에 계정을 연결하면 기록을 이어갈 수 있어요.":"記録はこの端末に自動保存されます。あとでアカウントを連携すれば続けて使えます。",
+    "회원가입 없이 시작":"登録せずに始める","기기 저장 중 · 계정 연결":"端末に保存中 · アカウント連携","이메일로 가입":"メールで登録","비밀번호는 8자 이상이면 됩니다.":"パスワードは8文字以上で設定できます。",
+    "표지·판본 찾기":"表紙・版を探す","같은 제목의 여러 출판사·판본 중 실제 읽는 책과 같은 표지를 골라보세요.":"同じタイトルの複数の出版社・版から、実際に読んでいる本と同じ表紙を選んでください。",
+    "책 제목·저자·ISBN":"書名・著者・ISBN","검색":"検索","표지만":"表紙のみ","이 판본":"この版を使う","이 판본 선택":"この版を選択","선택한 판본":"選択した版","판본 정보 없음":"版情報なし",
+    "책 제목·저자 또는 ISBN을 입력해 주세요.":"書名、著者、またはISBNを入力してください。","판본과 표지를 찾는 중…":"版と表紙を検索中…","검색 결과가 없어요. 직접 입력해도 됩니다.":"検索結果がありません。手動入力もできます。",
+    "표지와 판본 정보를 적용했어요.":"表紙と版情報を反映しました。","개의 판본을 찾았어요.":" 件の版が見つかりました。","검색 결과가 없어요.":"検索結果がありません。","검색에 실패했어요. 잠시 뒤 다시 시도해 주세요.":"検索に失敗しました。少し待ってから再試行してください。","읽고 있는 책":"読書中"
+  });
+
   function installDialogTranslation(){
     if(window.__mboDialogsLocalized) return;
     window.__mboDialogsLocalized=true;
