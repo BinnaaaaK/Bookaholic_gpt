@@ -1,5 +1,5 @@
-const SUPABASE_URL = "여기에_기존_GitHub_app.js의_SUPABASE_URL_값_붙여넣기";
-const SUPABASE_PUBLISHABLE_KEY = "여기에_기존_GitHub_app.js의_SUPABASE_PUBLISHABLE_KEY_값_붙여넣기";
+const SUPABASE_URL = "https://pywwlrfxqrljriumxmwf.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_DDpOhpK3oex7Fi85jTQ0rQ_8y2bdngi";
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
